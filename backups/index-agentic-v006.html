@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
+
+
+    <!-- When making your own version these PWA install pages are not needed. Started here -->
+    <link rel="manifest" href="pwa/manifest.json">
+    <script src="pwa/pwa.js"></script>
+    <!-- When making your own version these pages are not needed. Ended here -->
+
+
+
+
+
+    
+    <title>Sovereign AI & Dynamic Router Sandbox</title>
+    <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
+    <style>
+        @keyframes myPulseLoading {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .my-standby-active {
+            background: linear-gradient(-45deg, #1a1a1a, #222, #4caf50, #222, #1a1a1a);
+            background-size: 400% 400%;
+            animation: myPulseLoading 2s ease infinite !important;
+        }
+        details summary {
+            cursor: pointer;
+            padding: 8px;
+            background: #222;
+            border: 1px solid #333;
+            color: #4caf50;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        details[open] summary {
+            border-bottom: none;
+        }
+        .my-panel-inner {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-top: none;
+            padding: 15px;
+        }
+        .my-btn {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-family: monospace;
+            margin-right: 5px;
+        }
+        .my-btn:hover {
+            background: #444;
+        }
+        .my-btn-active {
+            background: #4caf50 !important;
+            color: #000 !important;
+            border-color: #4caf50 !important;
+        }
+        /* Custom styling for the new HTML-friendly terminal window */
+        .my-terminal-div {
+            width: 100%; 
+            height: 30vh; 
+            min-height: 150px; 
+            border: 1px solid #333; 
+            padding: 15px; 
+            background-color: #0d0d0d; 
+            color: #00ff00; 
+            margin-bottom: 10px; 
+            font-family: monospace; 
+            font-size: 0.95rem; 
+            box-sizing: border-box; 
+            resize: vertical;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 20px; font-family: monospace; background-color: #121212; color: #e0e0e0;">
+
+    <div style="width: 98%; max-width: 1800px; margin: 0 auto; border: 1px solid #333; padding: 20px; background-color: #1a1a1a; box-shadow: 0 4px 10px rgba(0,0,0,0.5); box-sizing: border-box;">
+        
+        <h2 style="margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; color: #4caf50;">
+            Sovereign Edge LLM Sandbox & Prompt Router
+        </h2>
+        
+        <p style="font-size: 0.9em; color: #aaa;">
+            Runs localized Large Language Models entirely inside your browser utilizing WebGPU acceleration, combined with an outbound text router helper.<br>
+            The Github for this webpage is at <a href="https://github.com/hpssjellis/gemma4-lite-rt-lm" style="color: #4caf50;">https://github.com/hpssjellis/gemma4-lite-rt-lm</a><br>
+            Active PWA for installation of this web page for offline use is at <a href="https://webmcu-ai.github.io/local-gemma4-pwa/index.html" style="color: #4caf50;">https://webmcu-ai.github.io/local-gemma4-pwa/index.html</a><br>
+            By Jeremy Ellis <a href="https://github.com/hpssjellis">Github</a>, or <a href="https://ca.linkedin.com/in/jeremy-ellis-4237a9bb">LinkedIn</a>: Use at your own risk. May 2026
+        </p>
+
+        <div style="margin-bottom: 20px; padding: 10px; border: 1px dashed #444; background: #222;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Select Local Weights Model Target:</label>
+            <select id="myModelSelector" onchange="myInitializeEngine(); mySaveConfigToLocalStorage();" style="width: 100%; padding: 8px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace;">
+                <option value="https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm">
+                    Gemma 4 E2B IT (Web Optimization via Hugging Face CDN)
+                </option>
+                <option value="https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-web.litertlm">
+                    Gemma 4 E4B IT (Larger Footprint / Highly Accurate)
+                </option>
+                <option value="https://huggingface.co/spaces/webml-community/bonsai-image-webgpu">
+                    Bonsai 27B Image (3 GB / Highly Accurate)
+                </option>
+
+                
+            </select>
+
+            <div style="margin-top: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px;">
+                <button onclick="myInitializeEngine()" style="padding: 8px 16px; background-color: #4caf50; color: #fff; border: none; font-weight: bold; cursor: pointer; font-family: monospace;">
+                    Compile & Instantiate Local Engine
+                </button>
+
+                <!-- Added: Activate LLM on page open Checkbox -->
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #bbb;">
+                    <input type="checkbox" id="myAutoActivateToggle" onchange="mySaveConfigToLocalStorage()" style="cursor: pointer; accent-color: #4caf50;">
+                    <label for="myAutoActivateToggle" style="cursor: pointer; user-select: none; font-weight: bold;">Activate LLM on page open</label>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-weight: bold;">Max Token Sequence Allocation:</label>
+                    <input type="number" id="myMaxTokensInput" value="4096" step="1024" min="1024" max="119808" 
+                           onchange="myHandleTokenChange(); mySaveConfigToLocalStorage();" 
+                           style="width: 100px; padding: 6px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace;">
+                </div>
+            </div>
+        </div>
+
+        <div id="myProgressContainer" style="margin-bottom: 15px; padding: 10px; background-color: #222; border: 1px solid #333; display: none;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85rem;">
+                <span id="myProgressStatusLabel" style="color: #4caf50;">Downloading Model Weights...</span>
+                <span id="myProgressPercentageLabel" style="color: #4caf50; font-weight: bold;">0%</span>
+            </div>
+            <div style="width: 100%; background-color: #333; height: 12px; border: 1px solid #444;">
+                <div id="myProgressBarFill" style="width: 0%; height: 100%; background-color: #4caf50; transition: width 0.1s linear;"></div>
+            </div>
+        </div>
+
+        <div id="myInferenceMetricsPanel" style="margin-bottom: 10px; padding: 10px 12px; background-color: #0a0a0a; border: 1px solid #222; display: flex; justify-content: space-between; font-size: 0.85rem; color: #888; transition: all 0.3s ease;">
+            <span>Pipeline State: <strong id="myStateIndicator" style="color: #ffc107;">Uninitialized</strong></span>
+            <span id="myTimerWrapper" style="display: none;"><span id="myTimerLabel">Time:</span> <strong id="myResponseTimer" style="color: #00ff00;">0.0s</strong></span>
+        </div>
+
+        <div id="myTerminalOutput" class="my-terminal-div">[System Log]: Engine uninitialized. Select a model target and compile to load hardware kernels...</div>
+
+        <div style="margin-bottom: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; font-size: 0.85rem; color: #bbb;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="myAutoScrollToggle" onchange="mySaveConfigToLocalStorage()" checked style="cursor: pointer; accent-color: #4caf50;">
+                <label for="myAutoScrollToggle" style="cursor: pointer; user-select: none;">Enable active terminal window auto-scrolling during streaming</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="myExcludePromptToggle" onchange="mySaveConfigToLocalStorage()" style="cursor: pointer; accent-color: #4caf50;">
+                <label for="myExcludePromptToggle" style="cursor: pointer; user-select: none;">Exclude user prompt tracking from terminal window</label>          
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: flex-end;">
+            <textarea id="myUserPrompt" placeholder="Enter prompt here or drag-and-drop text/code files directly onto this box..." 
+                      onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); mySubmitPrompt(); }"
+                      oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px';"
+                      style="flex-grow: 1; height: 110px; min-height: 110px; max-height: 300px; padding: 10px; background-color: #2b2b2b; color: #fff; border: 1px solid #444; font-family: monospace; resize: vertical; box-sizing: border-box; transition: background 0.2s ease;">Answer this question and then after your answer write a prompt for an LLM to better answer this question. The question is </textarea>
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <button id="mySendBtn" onclick="mySubmitPrompt()" style="padding: 10px 20px; background-color: #0056b3; color: #fff; border: none; font-weight: bold; cursor: pointer; font-family: monospace; height: 42px;">
+                    Stream
+                </button>
+                <button onclick="myClearWorkspace()" style="padding: 0 15px; background-color: #444; color: #fff; border: none; cursor: pointer; font-family: monospace; height: 32px; font-size: 0.8rem;">
+                    Clear
+                </button>
+               <input type=button value="reset"  id="myPromptReset" onclick="{document.getElementById('myUserPrompt').value = 'Answer this question and then after your answer write a prompt for an LLM to better answer this question. The question is'}">               
+            </div>
+        </div>
+
+        <div style="margin-bottom: 15px; padding: 15px; background: #181818; border: 1px solid #333;">
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 10px;">
+                <div style="flex-grow: 1; min-width: 250px;">        
+                     <label for="myUrlInput" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.85rem; color: #aaa;">Custom Helper Target URL: then ctrl-v to paste</label>
+                     <input type="text" id="myUrlInput" value="https://gemini.google.com/app" onchange="mySaveConfigToLocalStorage()" style="width: 70%; padding: 6px; background: #2b2b2b; color: #fff; border: 1px solid #444; font-family: monospace; box-sizing: border-box;">
+                </div>
+                <div style="display: flex; gap: 5px; align-items: flex-end; padding-top: 20px;">
+                    <button onclick="myHandleAction('custom')" style="padding: 8px 12px; cursor: pointer; font-family: monospace; background-color: #fff3e0; color: #000; border: 1px solid #ffe0b2; font-weight: bold;">Send Selected to Custom URL</button>
+                    <button onclick="myHandleAction('https://gemini.google.com/app')" style="padding: 8px 12px; cursor: pointer; font-family: monospace; background: #333; color: #fff; border: 1px solid #555;">Gemini</button>
+                    <button onclick="myHandleAction('https://chatgpt.com/')" style="padding: 8px 12px; cursor: pointer; font-family: monospace; background: #333; color: #fff; border: 1px solid #555;">ChatGPT</button>
+                    <button onclick="myHandleAction('https://claude.ai/new')" style="padding: 8px 12px; cursor: pointer; font-family: monospace; background: #333; color: #fff; border: 1px solid #555;">Claude</button>
+                </div>
+            </div>
+            <span style="font-size: 0.75rem; color: #777;">*Highlight parts of the streaming text inside the active window above to instantly port context layers to external systems.</span>
+        </div>
+
+        <details>
+            <summary>⚙️ System Instruction Rule Editor</summary>
+            <div class="my-panel-inner">
+                <label for="mySystemPromptInput" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.85rem; color: #aaa;">Edit System Context Layer:</label>
+                <textarea id="mySystemPromptInput" style="width: 100%; height: 80px; background: #0d0d0d; color: #fff; border: 1px solid #333; font-family: monospace; padding: 8px; box-sizing: border-box; resize: vertical;">You are a highly efficient, minimal edge assistant running client-side.</textarea>
+                <span style="font-size: 0.75rem; color: #777; display: block; margin-top: 5px;">*Note: Changes made here apply automatically to your next prompt stream. If your conversation loops, re-click "Compile & Instantiate Local Engine" to clear the context cache completely.</span>
+            </div>
+        </details>
+
+        <details>
+            <summary>🌐 HTML Viewer</summary>
+            <div class="my-panel-inner">
+                <button class="my-btn" onclick="myViewHtml()">Extract HTML</button>
+                <button class="my-btn" onclick="myRenderHtml()">Render in New Tab</button>
+                <button class="my-btn" onclick="myCopyHtml()">Copy Code</button>
+                <br><br>
+                <textarea id="html-preview" rows="6" style="width:100%; background: #0d0d0d; color: #fff; border: 1px solid #333; font-family: monospace; padding: 5px; box-sizing: border-box;" placeholder="HTML payloads will populate here..."></textarea>
+            </div>
+        </details>
+
+        <details>
+            <summary>∑ LATEX Math Viewer</summary>
+            <div class="my-panel-inner">
+                <div style="margin-bottom: 10px;">
+                    <label><input type="checkbox" id="auto-math-toggle" onchange="mySaveConfigToLocalStorage()" checked> Auto-render calculations while generation streams</label>
+                </div>
+                <button class="my-btn" onclick="myRenderMathManual()">Render Manually</button>
+                <br><br>
+                <div id="myMathOutput" style="font-size: 1.1em; border: 1px solid #333; padding: 15px; background: #121212; min-height: 50px; color: #e0e0e0; overflow-x: auto;">
+                    Rendered mathematics container...
+                </div>
+            </div>
+        </details>
+
+        <details>
+            <summary>🖼 Image Viewer (SVG & Inline Base64)</summary>
+            <div class="my-panel-inner">
+                <div style="margin-bottom: 10px;">
+                    <label><input type="checkbox" id="auto-image-toggle" onchange="mySaveConfigToLocalStorage()" checked> Auto-extract vector images during stream</label>
+                </div>
+                <button class="my-btn" onclick="myExtractImageManual()">Extract Image</button>
+                <br><br>
+                <div id="myImageCanvasContainer" style="width: 100%; display: flex; justify-content: center; align-items: center; background: #0f0f0f; padding: 20px; box-sizing: border-box; border: 1px solid #333; min-height: 200px; overflow: auto;">
+                    Vector elements and inline image configurations render here...
+                </div>
+            </div>
+        </details>
+
+        <details open>
+            <summary>📁 Agentic Folder Automation (Local, Zero API-Token Loop)</summary>
+            <div class="my-panel-inner">
+                <div style="font-size: 0.78rem; color: #888; margin-bottom: 12px; line-height: 1.5;">
+                    "Select / Create Agent Folder" needs one click (browser security requirement for
+                    <code>showDirectoryPicker</code>). After that, everything below — reading files,
+                    running inference, writing outputs, renaming processed files — runs with
+                    <b>no further clicks</b>, driven by an interval loop. Reloading the page will require
+                    one more click to re-confirm folder permission; that's a browser-enforced limit, not
+                    something JavaScript can route around.
+                </div>
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <button class="my-btn" onclick="myPickAgentFolder()">Select / Create Agent Folder</button>
+                    <button class="my-btn" onclick="myRelinkAgentFolder()">Relink Last Folder</button>
+                    <button class="my-btn" onclick="myWriteConfigToFolder()">Save config.json</button>
+                    <button class="my-btn" id="myLoopToggleBtn" onclick="myToggleAgentLoop()">Start Watch Loop</button>
+                    <button class="my-btn" onclick="myProcessAgentFolderOnce()">Run Once (Manual Scan)</button>
+                </div>
+
+                <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 10px;">
+                    Folder: <strong id="myFolderNameLabel" style="color:#4caf50;">none selected</strong>
+                    &nbsp;|&nbsp; Loop status: <strong id="myLoopStatusLabel" style="color:#ffc107;">stopped</strong>
+                    &nbsp;|&nbsp; Poll interval (ms):
+                    <input type="number" id="myPollIntervalInput" value="4000" min="1000" step="500"
+                           style="width: 90px; padding: 4px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace;">
+                </div>
+
+                <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 12px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        Max auto-chain iterations (same file):
+                        <input type="number" id="myMaxGenerationsInput" value="5" min="1" max="50"
+                               style="width: 70px; padding: 4px; background: #333; color: #fff; border: 1px solid #555; font-family: monospace;">
+                    </span>
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="myAutoChainToggle" checked style="cursor:pointer; accent-color:#4caf50;">
+                        <label for="myAutoChainToggle" style="cursor:pointer; user-select:none;">Auto-chain: overwrite .in.txt with the new output for the next pass</label>
+                    </span>
+                </div>
+
+                <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.85rem; color: #aaa;">
+                    config.json base prompt (editable here, written to disk on "Save config.json"):
+                </label>
+                <textarea id="myConfigBasePromptInput" style="width: 100%; height: 70px; background: #0d0d0d; color: #fff; border: 1px solid #333; font-family: monospace; padding: 8px; box-sizing: border-box; resize: vertical;">Read ${input} and produce a concise, improved version that adds a short paragraph better explaining the input. Return only the final output text — no preamble, no commentary, no markdown fences.</textarea>
+
+                <div style="font-size: 0.75rem; color: #777; margin-top: 8px; line-height: 1.5;">
+                    <b style="color:#999;">File variables:</b> write <code>${input}</code>, <code>${filename}</code>,
+                    or <code>${iteration}</code> anywhere in the prompt above to reference the file currently
+                    being processed. Any other <code>${name}</code> is looked up against the other files sitting
+                    in the folder right now, matched by the variable name shown in the File Browser panel below —
+                    e.g. <code>${sensor1}</code> pulls in the live content of <code>sensor1.in.txt</code>. This
+                    substitution happens in JavaScript before anything is sent to the model, so a prompt like
+                    <code>Combine ${sensor1} and ${sensor2}, then explain: ${input}</code> works even though the
+                    model itself never sees the placeholder syntax. If a referenced file is missing, it's marked
+                    <code>[MISSING FILE VARIABLE: ...]</code> instead of silently disappearing.
+                    <br><br>
+                    <b style="color:#999;">Convention (flat filenames, nothing auto-deleted):</b> drop
+                    <code>somename.in.txt</code> files into the selected folder. Each pass finds
+                    <code>*.in.txt</code> files, resolves the template, and <b>streams the reply live into the
+                    terminal above</b> just like a manual Stream click. Clean model output overwrites
+                    <code>somename.out.txt</code> every pass; a running commentary log (prompt template, variables
+                    resolved, iteration count, chain status) is appended to <code>somename.done.txt</code>.
+                    If auto-chain is on and under the iteration cap, <code>somename.in.txt</code> itself is
+                    overwritten with the new output so the next pass keeps refining it — same filename throughout,
+                    nothing new created, nothing deleted. Once the cap is reached (or auto-chain is off),
+                    <code>somename.in.txt</code> is left untouched; use Delete in the File Browser below when
+                    you're done with a thread. Compile & Instantiate must be run first so
+                    <code>myActiveConversation</code> exists.
+                </div>
+            </div>
+        </details>
+
+        <details open>
+            <summary>📄 Folder File Browser & Editor</summary>
+            <div class="my-panel-inner">
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+                    <button class="my-btn" onclick="myRefreshFileList()">Refresh File List</button>
+                    <span style="font-size:0.85rem; color:#aaa;">Files in folder: <strong id="myFileCountLabel" style="color:#4caf50;">0</strong></span>
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+                    <input type="text" id="myNewFileNameInput" placeholder="e.g. topic1.in.txt"
+                           style="flex-grow:1; padding:6px; background:#2b2b2b; color:#fff; border:1px solid #444; font-family:monospace; box-sizing:border-box;">
+                    <button class="my-btn" onclick="myCreateNewFile()">+ Create File</button>
+                </div>
+
+                <div id="myFileListContainer" style="border:1px solid #333; max-height:240px; overflow-y:auto; margin-bottom:16px; background:#141414;">
+                    <div style="padding:10px; color:#777; font-size:0.85rem;">No folder linked yet, or list not refreshed. Select a folder above, then click "Refresh File List".</div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+                    <label style="font-weight:bold; font-size:0.85rem; color:#aaa; white-space:nowrap;">Editing file name:</label>
+                    <input type="text" id="myCurrentEditingFileNameInput" placeholder="(none selected — click Edit on a file below)"
+                           style="flex-grow:1; padding:6px; background:#2b2b2b; color:#4caf50; border:1px solid #444; font-family:monospace; box-sizing:border-box;">
+                </div>
+                <textarea id="myFileEditArea" placeholder="Click Edit next to a file above to load its content here..."
+                          style="width:100%; height:180px; background:#0d0d0d; color:#fff; border:1px solid #333; font-family:monospace; padding:8px; box-sizing:border-box; resize:vertical;"></textarea>
+                <div style="margin-top:10px; display:flex; gap:12px; align-items:center;">
+                    <button class="my-btn" id="mySaveFileEditBtn" onclick="mySaveCurrentFileEdit()" disabled>Save Changes</button>
+                    <span id="mySaveStatusLabel" style="font-size:0.8rem; color:#777;"></span>
+                </div>
+                <div style="font-size:0.75rem; color:#777; margin-top:10px; line-height:1.5;">
+                    The green token on the left of each row is the exact <code>${var}</code> string that file
+                    resolves to in the base prompt above — click it to copy. Click <b>Edit</b> to load a file's
+                    content into the shared box below; the file name field above becomes editable too — change it
+                    and click Save to <b>rename</b> the file (this is how you edit its variable name, since
+                    <code>${var}</code> is always derived from the filename). Leave the name unchanged to just save
+                    content in place. Click <b>Delete</b> to remove a file outright — since nothing is auto-deleted
+                    by the agent loop anymore, this is now your manual control for ending a refinement thread.
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <script type="module">
+        import { Engine } from 'https://cdn.jsdelivr.net/npm/@litert-lm/core/+esm';
+
+        let myCoreEngine = null;
+        let myActiveConversation = null;
+        let myIsCompiling = false;
+        let myTimerIntervalId = null;
+        let myMathLiveIntervalId = null;
+
+        let myTerminalHistoryBuffer = `[System Log]: Engine uninitialized. Select a model target and compile to load hardware kernels...`;
+        let myAssistantResponseBuffer = "";
+
+        const myDbName = "mySovereignAiStorage";
+        const myStoreName = "myModelWeightsStore";
+        const MY_STORAGE_KEY = "mySovereignAiConfig";
+
+        // ADDED: Local Storage management logic
+        window.mySaveConfigToLocalStorage = () => {
+            const isAutoActivateOn = document.getElementById("myAutoActivateToggle").checked;
+
+            if (!isAutoActivateOn) {
+                // If unchecked, completely purge the configurations key entry to prevent loops
+                localStorage.removeItem(MY_STORAGE_KEY);
+                return;
+            }
+
+            // Save state of parameters, texts, and checkboxes into a cohesive structure
+            const configData = {
+                autoActivate: true,
+                modelTarget: document.getElementById("myModelSelector").value,
+                maxTokens: document.getElementById("myMaxTokensInput").value,
+                helperUrl: document.getElementById("myUrlInput").value,
+                toggles: {
+                    autoScroll: document.getElementById("myAutoScrollToggle").checked,
+                    excludePrompt: document.getElementById("myExcludePromptToggle").checked,
+                    autoMath: document.getElementById("auto-math-toggle").checked,
+                    autoImage: document.getElementById("auto-image-toggle").checked
+                }
+            };
+
+            localStorage.setItem(MY_STORAGE_KEY, JSON.stringify(configData));
+        };
+
+        const myLoadConfigFromLocalStorage = () => {
+            const savedRaw = localStorage.getItem(MY_STORAGE_KEY);
+            if (!savedRaw) return;
+
+            try {
+                const configData = JSON.parse(savedRaw);
+
+                // Re-hydrate application metrics 
+                document.getElementById("myAutoActivateToggle").checked = configData.autoActivate || false;
+                if (configData.modelTarget) document.getElementById("myModelSelector").value = configData.modelTarget;
+                if (configData.maxTokens) document.getElementById("myMaxTokensInput").value = configData.maxTokens;
+                if (configData.helperUrl) document.getElementById("myUrlInput").value = configData.helperUrl;
+
+                if (configData.toggles) {
+                    document.getElementById("myAutoScrollToggle").checked = configData.toggles.autoScroll;
+                    document.getElementById("myExcludePromptToggle").checked = configData.toggles.excludePrompt;
+                    document.getElementById("auto-math-toggle").checked = configData.toggles.autoMath;
+                    document.getElementById("auto-image-toggle").checked = configData.toggles.autoImage;
+                }
+
+                // Check automated runtime permission layers
+                if (configData.autoActivate === true) {
+                    setTimeout(() => {
+                        window.myInitializeEngine();
+                    }, 400); // 400ms delay protects against early engine creation state anomalies
+                }
+            } catch (err) {
+                console.error("Failed parsing localStorage configurations context tracking layers:", err);
+            }
+        };
+
+        // Setup File Drop Event Interceptors on Initialization
+        document.addEventListener("DOMContentLoaded", () => {
+            // Re-hydrate interface adjustments out of disk caches safely before attachment processes run
+            myLoadConfigFromLocalStorage();
+
+            const myPromptBox = document.getElementById("myUserPrompt");
+
+            myPromptBox.addEventListener("dragover", (myEvent) => {
+                myEvent.preventDefault();
+                myPromptBox.style.background = "#334155";
+            });
+
+            myPromptBox.addEventListener("dragleave", () => {
+                myPromptBox.style.background = "#2b2b2b";
+            });
+
+            myPromptBox.addEventListener("drop", async (myEvent) => {
+                myEvent.preventDefault();
+                myPromptBox.style.background = "#2b2b2b";
+
+                const myFilesList = myEvent.dataTransfer.files;
+                if (!myFilesList || myFilesList.length === 0) return;
+
+                for (const myFile of myFilesList) {
+                    if (myFile.type.startsWith("text/") || myFile.name.endsWith(".html") || myFile.name.endsWith(".js") || myFile.name.endsWith(".json") || myFile.name.endsWith(".css") || myFile.name.endsWith(".svg") || myFile.name.endsWith(".md")) {
+                        const myTextData = await myReadFileContents(myFile);
+                        
+                        const myCurrentText = myPromptBox.value;
+                        const mySpacing = myCurrentText.length > 0 ? "\n\n" : "";
+                        myPromptBox.value = myCurrentText + mySpacing + `[File content from ${myFile.name}]:\n${myTextData}`;
+                        
+                        myPromptBox.style.height = "auto";
+                        myPromptBox.style.height = myPromptBox.scrollHeight + "px";
+                    } else {
+                        myUpdateTerminalView(`\n[Drop Rejection Log]: File "${myFile.name}" skipped. Non-text binaries are not directly parses by the prompt window.`, true);
+                    }
+                }
+            });
+        });
+
+        // Your hyperlink parser function integrated cleanly
+const myConvertUrlsToHyperlinks = (myRawText) => {
+    // Optimized regex: finds URLs but stops before trailing punctuation, backticks, or quotes
+    const myUrlRegex = /(https?:\/\/[^\s`'"()<>]+)/g;
+    
+    return myRawText.replace(myUrlRegex, (myMatch) => {
+        // Clean up any trailing trailing punctuation that sneaks through
+        let myCleanUrl = myMatch.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]$/, '');
+        
+        // Remove markdown backticks if they are explicitly wrapping the URL bounds
+        if (myCleanUrl.startsWith('`')) myCleanUrl = myCleanUrl.slice(1);
+        if (myCleanUrl.endsWith('`')) myCleanUrl = myCleanUrl.slice(0, -1);
+        
+        return `<a href="${myCleanUrl}" target="_blank" style="color: #4caf50; font-weight: bold; text-decoration: underline;">${myCleanUrl}</a>`;
+    });
+};
+
+        // Helper File Parser via Async API Wrap
+        const myReadFileContents = async (myFileObject) => {
+            return new Promise((myResolve) => {
+                const myReaderInstance = new FileReader();
+                myReaderInstance.onload = (myEvent) => myResolve(myEvent.target.result);
+                myReaderInstance.readAsText(myFileObject);
+            });
+        };
+
+        const myOpenDatabase = async () => {
+            return new Promise((myResolve, myReject) => {
+                const myRequest = indexedDB.open(myDbName, 1);
+                myRequest.onupgradeneeded = (myEvent) => {
+                    const myDb = myEvent.target.result;
+                    if (!myDb.objectStoreNames.contains(myStoreName)) {
+                        myDb.createObjectStore(myStoreName);
+                    }
+                };
+                myRequest.onsuccess = (myEvent) => myResolve(myEvent.target.result);
+                myRequest.onerror = (myEvent) => myReject(myEvent.target.error);
+            });
+        };
+
+        const myGetStoredModel = async (myKey) => {
+            const myDb = await myOpenDatabase();
+            return new Promise((myResolve, myReject) => {
+                const myTransaction = myDb.transaction(myStoreName, "readonly");
+                const myStore = myTransaction.objectStore(myStoreName);
+                const myRequest = myStore.get(myKey);
+                myRequest.onsuccess = () => myResolve(myRequest.result || null);
+                myRequest.onerror = () => myReject(myRequest.error);
+            });
+        };
+
+        const mySaveModelToStore = async (myKey, myBlob) => {
+            const myDb = await myOpenDatabase();
+            return new Promise((myResolve, myReject) => {
+                const myTransaction = myDb.transaction(myStoreName, "readwrite");
+                const myStore = myTransaction.objectStore(myStoreName);
+                const myRequest = myStore.put(myBlob, myKey);
+                myTransaction.oncomplete = () => myResolve();
+                myTransaction.onerror = () => myReject(myTransaction.error);
+            });
+        };
+
+        // ADJUSTED: Modified to handle text selection context extraction out of a contenteditable/DIV window setup safely
+        window.myHandleAction = async (myTargetUrl) => {
+            let myTextToRoute = "";
+            const mySelection = window.getSelection();
+            
+            if (mySelection && mySelection.toString().trim().length > 0) {
+                myTextToRoute = mySelection.toString();
+            } else {
+                myTextToRoute = document.getElementById("myTerminalOutput").innerText;
+            }
+            
+            try {
+                await navigator.clipboard.writeText("");
+                await navigator.clipboard.writeText(myTextToRoute);
+            } catch (myError) {
+                console.log("Clipboard programmatic sync operation failed.", myError);
+            }
+            
+            const myFinalUrl = (myTargetUrl === 'custom') ? document.getElementById("myUrlInput").value : myTargetUrl;
+            window.open(myFinalUrl, '_blank');
+        };
+
+        // ADJUSTED: Re-targeted text conversions away from textarea .value into innerHTML parsing mechanics
+        const myUpdateTerminalView = (myNewContent, myIsAppending = false) => {
+            const myTerminal = document.getElementById("myTerminalOutput");
+            const myScrollAllowed = document.getElementById("myAutoScrollToggle").checked;
+
+            if (myIsAppending) {
+                myTerminalHistoryBuffer += myNewContent;
+                myAssistantResponseBuffer += myNewContent;
+            } else {
+                myTerminalHistoryBuffer = myNewContent;
+            }
+
+            // Parse text modifications through your custom hyperlink converter before mounting UI
+            myTerminal.innerHTML = myConvertUrlsToHyperlinks(myTerminalHistoryBuffer);
+
+            if (myScrollAllowed) {
+                myTerminal.scrollTop = myTerminal.scrollHeight;
+            }
+        };
+
+        window.myHandleTokenChange = () => {
+            const myInput = document.getElementById("myMaxTokensInput");
+            let myValue = parseInt(myInput.value, 10);
+            
+            if (isNaN(myValue) || myValue < 1024) {
+                myValue = 1024;
+            } else {
+                myValue = Math.round(myValue / 1024) * 1024;
+            }
+            myInput.value = myValue;
+
+            myUpdateTerminalView(`[System Log]: Token bounds updated to ${myValue}. Pipeline context invalidated. Click 'Compile & Instantiate Local Engine' to allocate new WebGPU memory mappings.`);
+        };
+
+        window.myInitializeEngine = async () => {
+            if (myIsCompiling) return;
+            myIsCompiling = true;
+
+            document.getElementById("myMaxTokensInput").disabled = true;
+            document.getElementById("myStateIndicator").innerText = "Compiling/Loading...";
+            document.getElementById("myStateIndicator").style.color = "#ffc107";
+
+            const myUrlSelector = document.getElementById("myModelSelector");
+            const mySelectedModelUrl = myUrlSelector.value;
+            const myDynamicTokenLimit = parseInt(document.getElementById("myMaxTokensInput").value, 10) || 4096;
+            const myModelCacheKey = mySelectedModelUrl.substring(mySelectedModelUrl.lastIndexOf('/') + 1);
+
+            const myProgressContainer = document.getElementById("myProgressContainer");
+            const myProgressBarFill = document.getElementById("myProgressBarFill");
+            const myProgressPercentageLabel = document.getElementById("myProgressPercentageLabel");
+            const myProgressStatusLabel = document.getElementById("myProgressStatusLabel");
+
+            myProgressContainer.style.display = "block";
+            myProgressBarFill.style.width = "0%";
+            myProgressBarFill.style.backgroundColor = "#4caf50";
+            myProgressPercentageLabel.innerText = "0%";
+            myProgressStatusLabel.innerText = "Querying local disk vault...";
+
+            myUpdateTerminalView(`[System Log]: Initiating runtime allocation...\n[System Log]: Scanning localized disk indexes for matching model signatures...\n`);
+            
+            try {
+                let myCompleteModelBlob = null;
+                const myCachedWeights = await myGetStoredModel(myModelCacheKey);
+
+                if (myCachedWeights) {
+                    myUpdateTerminalView(`[System Log]: Match detected! Loading binary copy directly from persistent local storage.\n`, true);
+                    myProgressBarFill.style.width = "100%";
+                    myProgressPercentageLabel.innerText = "100%";
+                    myProgressStatusLabel.innerText = "Loaded entirely from local disk storage";
+                    myCompleteModelBlob = myCachedWeights;
+                } else {
+                    myUpdateTerminalView(`[System Log]: No local match discovered. Intercepting HTTP network streams for model tracking...\n`, true);
+
+                    const myFetchResponse = await fetch(mySelectedModelUrl);
+                    if (!myFetchResponse.ok) {
+                        throw new Error(`HTTP network error returned status code: ${myFetchResponse.status}`);
+                    }
+
+                    const myTotalBytesHeader = myFetchResponse.headers.get('content-length');
+                    const myTotalBytes = myTotalBytesHeader ? parseInt(myTotalBytesHeader, 10) : 0;
+                    
+                    const myStreamReader = myFetchResponse.body.getReader();
+                    let myBytesAccumulated = 0;
+                    const myBinaryChunks = [];
+
+                    myProgressStatusLabel.innerText = "Downloading Model Weights...";
+
+                    while (true) {
+                        const { done: myStreamDone, value: myDataChunk } = await myStreamReader.read();
+                        if (myStreamDone) break;
+
+                        myBinaryChunks.push(myDataChunk);
+                        myBytesAccumulated += myDataChunk.length;
+
+                        const myMegaBytesLoaded = (myBytesAccumulated / (1024 * 1024)).toFixed(1);
+                        let myProgressStatusText = `[Serial Monitor Progress]: Fetched ${myMegaBytesLoaded} MB`;
+
+                        if (myTotalBytes > 0) {
+                            const myMegaBytesTotal = (myTotalBytes / (1024 * 1024)).toFixed(1);
+                            const myPercentage = Math.round((myBytesAccumulated / myTotalBytes) * 100);
+                            myProgressStatusText += ` / ${myMegaBytesTotal} MB (${myPercentage}%)`;
+
+                            myProgressBarFill.style.width = `${myPercentage}%`;
+                            myProgressPercentageLabel.innerText = `${myPercentage}%`;
+                            myProgressStatusLabel.innerText = `Downloading: ${myMegaBytesLoaded} / ${myMegaBytesTotal} MB`;
+                        } else {
+                            myProgressStatusLabel.innerText = `Downloading: ${myMegaBytesLoaded} MB (Unbounded Size)`;
+                        }
+
+                        myUpdateTerminalView(`[System Log]: Allocating local model space...\nTarget: ${mySelectedModelUrl}\n${myProgressStatusText}`);
+                    }
+
+                    myUpdateTerminalView(`\n[System Log]: Network array download complete. Merging binary parts...`, true);
+                    myCompleteModelBlob = new Blob(myBinaryChunks);
+
+                    myProgressStatusLabel.innerText = "Saving weights to permanent local database...";
+                    myUpdateTerminalView(`\n[System Log]: Storing weights container into permanent browser vault database for zero-network launches...`, true);
+                    
+                    try {
+                        await mySaveModelToStore(myModelCacheKey, myCompleteModelBlob);
+                        myUpdateTerminalView(`\n[System Log]: Stored successfully.`, true);
+                    } catch (myDbWriteError) {
+                        myUpdateTerminalView(`\n[System Log] Warning: Unable to commit to IndexedDB database storage. Space quotas may be exceeded, but session compilation will still attempt to proceed.`, true);
+                        console.warn(myDbWriteError);
+                    }
+                }
+                
+                const myModelVirtualObjectUrl = URL.createObjectURL(myCompleteModelBlob);
+                myProgressStatusLabel.innerText = "Compiling WebGPU Hardware Shaders...";
+                myProgressBarFill.style.backgroundColor = "#0056b3";
+
+                myUpdateTerminalView(`\n[System Log]: Model weight arrays successfully committed to browser memory storage.`, true);
+                myUpdateTerminalView(`\n[System Log]: Allocating memory tables for ${myDynamicTokenLimit} max sequence tokens and compiling WebGPU hardware pipelines...`, true);
+
+                myCoreEngine = await Engine.create({
+                    model: myModelVirtualObjectUrl,
+                    mainExecutorSettings: { maxNumTokens: myDynamicTokenLimit }
+                });
+
+                // Set up the conversation layer pulling the text from the hidden text field context
+                myActiveConversation = await myCoreEngine.createConversation({
+                    preface: {
+                        messages: [
+                            { role: 'system', content: document.getElementById("mySystemPromptInput").value }
+                        ]
+                    }
+                });
+
+                myProgressStatusLabel.innerText = "Engine Active & Sovereign";
+                myProgressBarFill.style.backgroundColor = "#4caf50";
+                myProgressBarFill.style.width = "100%";
+                myProgressPercentageLabel.innerText = "100%";
+
+                document.getElementById("myStateIndicator").innerText = "Online & Isolated";
+                document.getElementById("myStateIndicator").style.color = "#4caf50";
+
+                URL.revokeObjectURL(myModelVirtualObjectUrl);
+                myUpdateTerminalView(`\n[System Log]: Hardware pipeline validated. WebGPU bindings compiled successfully with a limit of ${myDynamicTokenLimit} tokens.\n[System Log]: Edge model sandbox online and running isolated. Ready for localized inference.\n\n`, true);
+                
+                myIsCompiling = false;
+                document.getElementById("myMaxTokensInput").disabled = false;
+
+            } catch (myError) {
+                myProgressStatusLabel.innerText = "Engine Initialization Failed";
+                myProgressBarFill.style.backgroundColor = "#ff3333";
+                document.getElementById("myStateIndicator").innerText = "Error Status";
+                document.getElementById("myStateIndicator").style.color = "#ff3333";
+                myUpdateTerminalView(`\n\n[Hardware/API Error]: Execution pipeline compilation failure. Ensure your browser environment natively supports WebGPU flag permissions.\nDetails: ${myError.message}`, true);
+                
+                myIsCompiling = false;
+                document.getElementById("myMaxTokensInput").disabled = false;
+            }
+        };
+
+        const myExtractHtmlPattern = (mySrcString) => {
+            const myMatch = mySrcString.match(/<!DOCTYPE html>[\s\S]*?<\/html>/si) || mySrcString.match(/<html[\s\S]*?<\/html>/si);
+            return myMatch ? myMatch[0] : "";
+        };
+
+        window.myViewHtml = () => {
+            document.getElementById("html-preview").value = myExtractHtmlPattern(myAssistantResponseBuffer);
+        };
+
+        window.myRenderHtml = () => {
+            const myContent = document.getElementById("html-preview").value.trim();
+            if (!myContent) return;
+            const myTargetWin = window.open('', 'gemma-render');
+            myTargetWin.document.write(myContent);
+            myTargetWin.document.close();
+        };
+
+        window.myCopyHtml = () => {
+            const myContent = document.getElementById("html-preview").value.trim();
+            if (!myContent) return;
+            navigator.clipboard.writeText(myContent).then(() => alert('Markup copied to clipboard container.'));
+        };
+
+        const myProcessMathFormatting = async () => {
+            if (!myAssistantResponseBuffer) return;
+            let myCleanText = myAssistantResponseBuffer.replace(/^###\s*(.*)$/gm, "<h2>$1</h2>")
+                                                       .replace(/\n/g, ' <br> ')
+                                                       .replace(/\*\*(.*?)\*\"/g, "<b>$1</b>");
+            const myOutputNode = document.getElementById("myMathOutput");
+            myOutputNode.innerHTML = myCleanText;
+            if (window.MathJax) {
+                await MathJax.typesetPromise([myOutputNode]);
+            }
+        };
+
+        window.myRenderMathManual = () => {
+            myProcessMathFormatting();
+        };
+
+        const myProcessImageExtraction = () => {
+            if (!myAssistantResponseBuffer) return;
+            const myCanvas = document.getElementById("myImageCanvasContainer");
+
+            if (myAssistantResponseBuffer.includes("<svg") && myAssistantResponseBuffer.includes("</svg>")) {
+                const mySvgBlock = myAssistantResponseBuffer.match(/<svg[\s\S]*?<\/svg>/);
+                if (mySvgBlock) {
+                    myCanvas.innerHTML = mySvgBlock[0];
+                    return;
+                }
+            }
+
+            const myBase64Img = myAssistantResponseBuffer.match(/<img\s+[^>]*src=["'](data:image\/[^"']+)["']/);
+            if (myBase64Img && myBase64Img[1]) {
+                myCanvas.innerHTML = `<img src="${myBase64Img[1]}" style="max-width: 100%; max-height: 400px; object-fit: contain;" />`;
+            }
+        };
+
+        window.myExtractImageManual = () => {
+            myProcessImageExtraction();
+        };
+
+        window.myClearWorkspace = () => {
+            myTerminalHistoryBuffer = `[System Log]: Workspace reset completed.`;
+            myAssistantResponseBuffer = "";
+            myUpdateTerminalView("");
+            document.getElementById("html-preview").value = "";
+            document.getElementById("myMathOutput").innerHTML = "Rendered mathematics container...";
+            document.getElementById("myImageCanvasContainer").innerHTML = "Vector elements and inline image configurations render here...";
+            
+            const myPromptBox = document.getElementById("myUserPrompt");
+            myPromptBox.value = "";
+            myPromptBox.style.height = "42px";
+        };
+
+        window.mySubmitPrompt = async () => {
+            const myInputNode = document.getElementById("myUserPrompt");
+            let myTextPayload = myInputNode.value.trim();
+
+            if (!myTextPayload) return;
+
+            if (!myActiveConversation) {
+                myUpdateTerminalView(`\n\n[Block Warning]: Cannot process inference request. The local pipeline engine has not finished initializing. please tap "Compile & Instantiate Local Engine" first.`, true);
+                return;
+            }
+
+            myInputNode.value = '';
+            myInputNode.style.height = '42px';
+            myAssistantResponseBuffer = "";
+
+            /* REMOVED: Old URL detector and auto-tab hijacking mechanism completely stripped.
+            */
+
+            // Sync the local conversation system context dynamically right before streaming
+            try {
+                myActiveConversation.preface.messages[0].content = document.getElementById("mySystemPromptInput").value;
+            } catch (myConfigError) {
+                console.log("System context frame synchronization alert:", myConfigError);
+            }
+
+            const myExcludePrompt = document.getElementById("myExcludePromptToggle").checked;
+
+            if (myExcludePrompt) {
+                myUpdateTerminalView(`\n\nAI Sovereign Node: `, true);
+            } else {
+                myUpdateTerminalView(`\n\n>>> User Request: ${myTextPayload}\n\nAI Sovereign Node: `, true);
+            }
+
+            const myMetricsPanel = document.getElementById("myInferenceMetricsPanel");
+            const myTimerElement = document.getElementById("myResponseTimer");
+            const myTimerWrapper = document.getElementById("myTimerWrapper");
+            const myTimerLabel = document.getElementById("myTimerLabel");
+            const myStateIndicator = document.getElementById("myStateIndicator");
+            
+            myStateIndicator.innerText = "STANDBY: Computing WebGPU Matrix Prefill...";
+            myStateIndicator.style.color = "#ffc107";
+            myTimerLabel.innerText = "Status:";
+            myTimerElement.innerText = "GPU Processing...";
+            myTimerElement.style.color = "#ffc107";
+            myTimerWrapper.style.display = "inline";
+            
+            myMetricsPanel.classList.add("my-standby-active");
+            
+            clearInterval(myTimerIntervalId);
+            clearInterval(myMathLiveIntervalId);
+            const myExecutionStartTime = performance.now();
+
+            myTimerIntervalId = setInterval(() => {
+                const myElapsedSeconds = ((performance.now() - myExecutionStartTime) / 1000).toFixed(1);
+                myTimerLabel.innerText = "Running:";
+                myTimerElement.innerText = `${myElapsedSeconds}s`;
+                myTimerElement.style.color = "#00ff00";
+            }, 100);
+
+            if (document.getElementById("auto-math-toggle").checked) {
+                myMathLiveIntervalId = setInterval(myProcessMathFormatting, 1200);
+            }
+
+            try {
+                const myTokenStream = await myActiveConversation.sendMessageStreaming(myTextPayload);
+                
+                for await (const myChunk of myTokenStream) {
+                    if (myChunk && myChunk.content) {
+                        for (const myItem of myChunk.content) {
+                            if (myItem.type === 'text') {
+                                myUpdateTerminalView(myItem.text, true);
+                                if (document.getElementById("auto-image-toggle").checked) {
+                                    myProcessImageExtraction();
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (myExecutionError) {
+                myUpdateTerminalView(`\n\n[Runtime Exception Encountered]: Unable to safely sample next token matrix.\nDetails: ${myExecutionError.message}`, true);
+                console.error(myExecutionError);
+            } finally {
+                clearInterval(myTimerIntervalId);
+                clearInterval(myMathLiveIntervalId);
+                myMetricsPanel.classList.remove("my-standby-active");
+                
+                const myFinalElapsedSeconds = ((performance.now() - myExecutionStartTime) / 1000).toFixed(2);
+                myTimerLabel.innerText = "Total Duration:";
+                myTimerElement.innerText = `${myFinalElapsedSeconds}s`;
+                myTimerElement.style.color = "#00ff00";
+                
+                myStateIndicator.innerText = "Online & Isolated";
+                myStateIndicator.style.color = "#4caf50";
+
+                myProcessMathFormatting();
+                myProcessImageExtraction();
+                myViewHtml();
+            }
+        };
+
+        // ==========================================================================
+        // ADDED: Agentic Folder Automation (File System Access API)
+        //
+        // Key fact this whole block depends on:
+        //   - showDirectoryPicker() and requestPermission() REQUIRE a live user
+        //     gesture (a click). Browsers enforce this so a page can never silently
+        //     get read/write access to your disk. This cannot be scripted around.
+        //   - Once a FileSystemDirectoryHandle has 'readwrite' permission granted,
+        //     createWritable() / write() / close() and getFileHandle() / getFile()
+        //     do NOT require further gestures. They can be called from a
+        //     setInterval loop indefinitely for the rest of the tab session.
+        //   - On page reload, permission is not silently re-granted; requestPermission()
+        //     must be called again from a click (myRelinkAgentFolder below), even
+        //     though the *handle itself* can be restored from IndexedDB.
+        // ==========================================================================
+
+        let myAgentDirHandle = null;
+        let myAgentLoopIntervalId = null;
+        let myAgentLoopRunning = false;
+        const MY_AGENT_DB_KEY = "myAgentFolderHandle";
+
+        window.myPickAgentFolder = async () => {
+            if (!window.showDirectoryPicker) {
+                myUpdateTerminalView(`\n[Agent Log]: This browser does not support the File System Access API (showDirectoryPicker). Try Chrome or Edge on desktop.`, true);
+                return;
+            }
+            try {
+                myAgentDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                document.getElementById("myFolderNameLabel").innerText = myAgentDirHandle.name;
+                myUpdateTerminalView(`\n[Agent Log]: Folder "${myAgentDirHandle.name}" linked with readwrite permission.`, true);
+
+                // Persist the handle object itself (IndexedDB can store FileSystemHandles
+                // directly) so it can be offered again on reload via myRelinkAgentFolder.
+                await myStoreAgentHandle(myAgentDirHandle);
+
+                await myLoadOrCreateConfig();
+                await myRefreshFileList();
+            } catch (myErr) {
+                myUpdateTerminalView(`\n[Agent Log]: Folder selection cancelled or failed: ${myErr.message}`, true);
+            }
+        };
+
+        const myStoreAgentHandle = async (myHandle) => {
+            const myDb = await myOpenDatabase();
+            return new Promise((myResolve, myReject) => {
+                const myTx = myDb.transaction(myStoreName, "readwrite");
+                myTx.objectStore(myStoreName).put(myHandle, MY_AGENT_DB_KEY);
+                myTx.oncomplete = () => myResolve();
+                myTx.onerror = () => myReject(myTx.error);
+            });
+        };
+
+        // Still needs one click (requestPermission requires a user gesture), but
+        // saves the user from re-navigating the OS folder picker after a reload.
+        window.myRelinkAgentFolder = async () => {
+            const myStoredHandle = await myGetStoredModel(MY_AGENT_DB_KEY);
+            if (!myStoredHandle) {
+                myUpdateTerminalView(`\n[Agent Log]: No previously linked folder found in this browser profile. Use "Select / Create Agent Folder".`, true);
+                return;
+            }
+            try {
+                const myPermissionState = await myStoredHandle.requestPermission({ mode: 'readwrite' });
+                if (myPermissionState === 'granted') {
+                    myAgentDirHandle = myStoredHandle;
+                    document.getElementById("myFolderNameLabel").innerText = myAgentDirHandle.name;
+                    myUpdateTerminalView(`\n[Agent Log]: Relinked to folder "${myAgentDirHandle.name}".`, true);
+                    await myLoadOrCreateConfig();
+                    await myRefreshFileList();
+                } else {
+                    myUpdateTerminalView(`\n[Agent Log]: Permission denied for stored folder handle.`, true);
+                }
+            } catch (myErr) {
+                myUpdateTerminalView(`\n[Agent Log]: Could not relink stored folder handle: ${myErr.message}`, true);
+            }
+        };
+
+        window.myLoadOrCreateConfig = async () => {
+            if (!myAgentDirHandle) return;
+            try {
+                const myConfigHandle = await myAgentDirHandle.getFileHandle('config.json', { create: false });
+                const myConfigFile = await myConfigHandle.getFile();
+                const myConfigText = await myConfigFile.text();
+                const myConfigObj = JSON.parse(myConfigText);
+
+                if (typeof myConfigObj.basePrompt === 'string') {
+                    document.getElementById("myConfigBasePromptInput").value = myConfigObj.basePrompt;
+                }
+                if (myConfigObj.pollIntervalMs) {
+                    document.getElementById("myPollIntervalInput").value = myConfigObj.pollIntervalMs;
+                }
+                if (myConfigObj.maxGenerations) {
+                    document.getElementById("myMaxGenerationsInput").value = myConfigObj.maxGenerations;
+                }
+                if (typeof myConfigObj.autoChain === 'boolean') {
+                    document.getElementById("myAutoChainToggle").checked = myConfigObj.autoChain;
+                }
+                myUpdateTerminalView(`\n[Agent Log]: Loaded existing config.json from folder.`, true);
+            } catch (myErr) {
+                myUpdateTerminalView(`\n[Agent Log]: No config.json found in this folder. Writing default...`, true);
+                await myWriteConfigToFolder();
+            }
+        };
+
+        // Fully automatable (no gesture needed) as long as myAgentDirHandle
+        // already has 'readwrite' permission from a prior click.
+        window.myWriteConfigToFolder = async () => {
+            if (!myAgentDirHandle) {
+                myUpdateTerminalView(`\n[Agent Log]: Select a folder first.`, true);
+                return;
+            }
+            const myConfigObj = {
+                basePrompt: document.getElementById("myConfigBasePromptInput").value,
+                inputSuffix: ".in.txt",
+                outputSuffix: ".out.txt",
+                doneSuffix: ".done.txt",
+                pollIntervalMs: parseInt(document.getElementById("myPollIntervalInput").value, 10) || 4000,
+                maxGenerations: parseInt(document.getElementById("myMaxGenerationsInput").value, 10) || 5,
+                autoChain: document.getElementById("myAutoChainToggle").checked,
+                createdOrUpdated: new Date().toISOString()
+            };
+            const myConfigFileHandle = await myAgentDirHandle.getFileHandle('config.json', { create: true });
+            const myWritable = await myConfigFileHandle.createWritable();
+            await myWritable.write(JSON.stringify(myConfigObj, null, 2));
+            await myWritable.close();
+            myUpdateTerminalView(`\n[Agent Log]: config.json written/updated. This write required no click.`, true);
+        };
+
+        // ==========================================================================
+        // ADDED: File variable substitution — ${varname} in the prompt template.
+        // Resolution happens entirely here, in JS, BEFORE the text is sent to the
+        // model. The model never sees "${varname}" — it only ever sees the real
+        // file content already dropped in. This is what makes multi-file prompts
+        // (e.g. combining several sensor-reading files later) reliable, since it
+        // doesn't depend on the model correctly interpreting placeholder syntax.
+        // ==========================================================================
+
+        // Derives a clean variable name from a filename by stripping known
+        // suffixes: "sensor1.in.txt" -> "sensor1", "config.json" -> "config".
+        const myDeriveVarName = (myFileName) => {
+            let myBase = myFileName;
+            myBase = myBase.replace(/\.(in|out|done)\.txt$/i, '');
+            myBase = myBase.replace(/\.(json|txt)$/i, '');
+            return myBase.replace(/[^a-zA-Z0-9]/g, '_');
+        };
+
+        // Scans the live folder once and returns { varName -> {name, handle} },
+        // first-match-wins on any naming collision.
+        const myBuildVarNameIndex = async () => {
+            const myIndex = {};
+            for await (const [myEntryName, myEntryHandle] of myAgentDirHandle.entries()) {
+                if (myEntryHandle.kind !== 'file') continue;
+                const myVarName = myDeriveVarName(myEntryName);
+                if (!(myVarName in myIndex)) {
+                    myIndex[myVarName] = { name: myEntryName, handle: myEntryHandle };
+                }
+            }
+            return myIndex;
+        };
+
+        // Replaces every ${varName} in myTemplate. Built-ins (input/filename/
+        // generation/iteration) take priority; anything else is looked up
+        // against other files currently sitting in the folder by their derived
+        // variable name. Unresolvable variables are left as a visible
+        // [MISSING ...] marker rather than silently vanishing.
+        const myResolvePromptTemplate = async (myTemplate, myBuiltIns) => {
+            const myVarPattern = /\$\{([a-zA-Z0-9_]+)\}/g;
+            const myUniqueVarNames = [...new Set([...myTemplate.matchAll(myVarPattern)].map((myMatch) => myMatch[1]))];
+
+            const myVarIndex = await myBuildVarNameIndex();
+            let myResolvedText = myTemplate;
+            const myVarsUsed = [];
+            const myVarsMissing = [];
+
+            for (const myVarName of myUniqueVarNames) {
+                let myReplacementValue;
+                if (Object.prototype.hasOwnProperty.call(myBuiltIns, myVarName)) {
+                    myReplacementValue = String(myBuiltIns[myVarName]);
+                    myVarsUsed.push(myVarName);
+                } else if (myVarIndex[myVarName]) {
+                    const myFile = await myVarIndex[myVarName].handle.getFile();
+                    myReplacementValue = await myFile.text();
+                    myVarsUsed.push(`${myVarName} (from ${myVarIndex[myVarName].name})`);
+                } else {
+                    myReplacementValue = `[MISSING FILE VARIABLE: \${${myVarName}}]`;
+                    myVarsMissing.push(myVarName);
+                }
+                const myVarPatternExact = new RegExp(`\\$\\{${myVarName}\\}`, 'g');
+                myResolvedText = myResolvedText.replace(myVarPatternExact, myReplacementValue);
+            }
+
+            // Backward-compat safety net: if the template never referenced ${input}
+            // at all, the current file's content would otherwise never reach the
+            // model. Append it explicitly and say so, rather than silently dropping it.
+            let myAutoAppended = false;
+            if (!myUniqueVarNames.includes('input')) {
+                myResolvedText += `\n\n${myBuiltIns.input}`;
+                myAutoAppended = true;
+            }
+
+            return { resolvedText: myResolvedText, varsUsed: myVarsUsed, varsMissing: myVarsMissing, autoAppended: myAutoAppended };
+        };
+
+        // Counts how many times this basename has already looped, by counting
+        // commentary blocks already present in its .done.txt log. Returns 0 if
+        // no .done.txt exists yet (first pass). This is what lets the iteration
+        // cap survive a page reload without needing generation-numbered files.
+        const myCountPriorIterations = async (myDoneFileName) => {
+            try {
+                const myDoneHandle = await myAgentDirHandle.getFileHandle(myDoneFileName, { create: false });
+                const myDoneFile = await myDoneHandle.getFile();
+                const myDoneText = await myDoneFile.text();
+                const myMatches = myDoneText.match(/-{5}\s*AGENT COMMENTARY\s*-{5}/g);
+                return myMatches ? myMatches.length : 0;
+            } catch (myErr) {
+                return 0;
+            }
+        };
+
+        // One full scan pass: find *.in.txt files, run each through the local
+        // engine, STREAM the reply into the same main terminal a manual Stream
+        // click uses (so math/HTML/image viewers also pick it up).
+        //
+        // Fixed, flat filenames — no generation suffixes:
+        //   basename.in.txt   -> trigger file. NEVER auto-deleted.
+        //   basename.out.txt  -> latest clean model response only, overwritten each pass.
+        //   basename.done.txt -> append-only commentary log (grows every pass).
+        //
+        // If auto-chain is on and under the iteration cap, basename.in.txt is
+        // OVERWRITTEN in place with the new output — same filename, so this
+        // doesn't create new files and doesn't get caught by the directory
+        // iterator as a "new" entry mid-scan (that was the bug behind fast,
+        // uncontrolled chaining before). If chaining is off or the cap is hit,
+        // basename.in.txt is left completely untouched.
+        window.myProcessAgentFolderOnce = async () => {
+            if (!myAgentDirHandle) {
+                myUpdateTerminalView(`\n[Agent Log]: Select a folder first.`, true);
+                return;
+            }
+            if (!myActiveConversation) {
+                myUpdateTerminalView(`\n[Agent Log]: Compile & Instantiate the local engine first.`, true);
+                return;
+            }
+
+            const myMaxIterations = parseInt(document.getElementById("myMaxGenerationsInput").value, 10) || 5;
+            const myAutoChainOn = document.getElementById("myAutoChainToggle").checked;
+            const myBasePrompt = document.getElementById("myConfigBasePromptInput").value;
+
+            let myFoundAny = false;
+
+            for await (const [myEntryName, myEntryHandle] of myAgentDirHandle.entries()) {
+                if (myEntryHandle.kind !== 'file') continue;
+                if (!myEntryName.endsWith('.in.txt')) continue;
+
+                myFoundAny = true;
+                const myBaseName = myEntryName.replace(/\.in\.txt$/, '');
+                const myOutName = `${myBaseName}.out.txt`;
+                const myDoneName = `${myBaseName}.done.txt`;
+
+                try {
+                    const myInputFile = await myEntryHandle.getFile();
+                    const myInputText = await myInputFile.text();
+
+                    const myIterationNumber = (await myCountPriorIterations(myDoneName)) + 1;
+
+                    const { resolvedText: myFullPrompt, varsUsed: myVarsUsed, varsMissing: myVarsMissing, autoAppended: myAutoAppended } =
+                        await myResolvePromptTemplate(myBasePrompt, {
+                            input: myInputText,
+                            filename: myEntryName,
+                            generation: myIterationNumber,
+                            iteration: myIterationNumber
+                        });
+
+                    if (myVarsMissing.length > 0) {
+                        myUpdateTerminalView(`\n[Agent Log]: Warning — prompt template references missing file variable(s): ${myVarsMissing.join(', ')}.`, true);
+                    }
+
+                    // Sync system prompt the same way manual Stream does, so agent
+                    // runs stay consistent with whatever the System Instruction panel holds.
+                    try {
+                        myActiveConversation.preface.messages[0].content = document.getElementById("mySystemPromptInput").value;
+                    } catch (myConfigError) {
+                        console.log("System context frame synchronization alert:", myConfigError);
+                    }
+
+                    // Stream directly into the visible terminal via myUpdateTerminalView,
+                    // exactly like mySubmitPrompt does — so math/HTML/image viewers pick
+                    // up agent output too, not just manual Stream output.
+                    myUpdateTerminalView(`\n\n>>> [Agent | ${myEntryName} | iteration ${myIterationNumber}] Resolved prompt sent (${myFullPrompt.length} chars)\n\nAI Sovereign Node (Agent): `, true);
+
+                    document.getElementById("myStateIndicator").innerText = `Agent Processing: ${myEntryName}`;
+                    document.getElementById("myStateIndicator").style.color = "#ffc107";
+
+                    let myCollectedOutput = "";
+                    const myTokenStream = await myActiveConversation.sendMessageStreaming(myFullPrompt);
+                    for await (const myChunk of myTokenStream) {
+                        if (myChunk && myChunk.content) {
+                            for (const myItem of myChunk.content) {
+                                if (myItem.type === 'text') {
+                                    myCollectedOutput += myItem.text;
+                                    myUpdateTerminalView(myItem.text, true);
+                                    if (document.getElementById("auto-image-toggle").checked) {
+                                        myProcessImageExtraction();
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    document.getElementById("myStateIndicator").innerText = "Online & Isolated";
+                    document.getElementById("myStateIndicator").style.color = "#4caf50";
+                    myProcessMathFormatting();
+                    myViewHtml();
+
+                    myCollectedOutput = myCollectedOutput.trim();
+
+                    // .out.txt: clean final text only, overwritten each pass.
+                    const myOutHandle = await myAgentDirHandle.getFileHandle(myOutName, { create: true });
+                    const myOutWritable = await myOutHandle.createWritable();
+                    await myOutWritable.write(myCollectedOutput);
+                    await myOutWritable.close();
+
+                    const myCanChain = myAutoChainOn && myIterationNumber < myMaxIterations;
+
+                    const myCommentary = [
+                        '',
+                        '----- AGENT COMMENTARY -----',
+                        `Processed: ${new Date().toISOString()}`,
+                        `Source file: ${myEntryName}`,
+                        `Iteration: ${myIterationNumber} of max ${myMaxIterations}`,
+                        `Prompt template (config.json basePrompt): ${myBasePrompt}`,
+                        `Variables resolved: ${myVarsUsed.length > 0 ? myVarsUsed.join(', ') : '(none referenced)'}`,
+                        myVarsMissing.length > 0 ? `Variables MISSING: ${myVarsMissing.join(', ')}` : null,
+                        myAutoAppended ? `Note: template did not reference \${input} — input was auto-appended for safety.` : null,
+                        `Resolved prompt length: ${myFullPrompt.length} chars`,
+                        `Input length: ${myInputText.length} chars`,
+                        `Output length: ${myCollectedOutput.length} chars`,
+                        myCanChain
+                            ? `Chained: yes -> ${myEntryName} overwritten in place with this output for the next pass.`
+                            : `Chained: no (${myAutoChainOn ? 'iteration cap reached — ' + myEntryName + ' left unchanged' : 'auto-chain disabled'})`,
+                        '-----------------------------'
+                    ].filter((myLine) => myLine !== null).join('\n');
+
+                    // Append-only log: read whatever is already in .done.txt (if
+                    // anything) and add this pass's commentary after it.
+                    let myExistingDoneText = '';
+                    try {
+                        const myExistingDoneHandle = await myAgentDirHandle.getFileHandle(myDoneName, { create: false });
+                        const myExistingDoneFile = await myExistingDoneHandle.getFile();
+                        myExistingDoneText = await myExistingDoneFile.text();
+                    } catch (myNoDoneFileErr) {
+                        myExistingDoneText = '';
+                    }
+                    const myDoneHandle = await myAgentDirHandle.getFileHandle(myDoneName, { create: true });
+                    const myDoneWritable = await myDoneHandle.createWritable();
+                    await myDoneWritable.write(myExistingDoneText + myCommentary);
+                    await myDoneWritable.close();
+
+                    // The only place .in.txt content ever changes: overwritten in
+                    // place with the new output when chaining, otherwise left alone.
+                    // Never deleted, never renamed, never replaced with a new filename.
+                    if (myCanChain) {
+                        const myInWritable = await myEntryHandle.createWritable();
+                        await myInWritable.write(myCollectedOutput);
+                        await myInWritable.close();
+                    }
+
+                    myUpdateTerminalView(`\n\n[Agent Log]: Wrote "${myOutName}", appended to "${myDoneName}".${myCanChain ? ` "${myEntryName}" overwritten for next pass.` : ' No chaining this pass.'} Zero clicks used.`, true);
+                } catch (myFileErr) {
+                    myUpdateTerminalView(`\n[Agent Log]: Error processing "${myEntryName}": ${myFileErr.message}`, true);
+                }
+            }
+
+            if (!myFoundAny) {
+                myUpdateTerminalView(`\n[Agent Log]: Scan complete. No *.in.txt files found.`, true);
+            }
+
+            await myRefreshFileList();
+        };
+
+        // ==========================================================================
+        // ADDED: Folder File Browser & Editor
+        // A plain listing + single shared edit box, as requested — not one editor
+        // per file. myFileHandleMap keeps live FileSystemFileHandle references so
+        // Edit/Save don't need to re-resolve names through the directory each time.
+        // ==========================================================================
+
+        let myFileHandleMap = {};
+        let myCurrentEditingFileName = null;
+
+        window.myRefreshFileList = async () => {
+            if (!myAgentDirHandle) {
+                myUpdateTerminalView(`\n[Agent Log]: Select a folder first.`, true);
+                return;
+            }
+
+            myFileHandleMap = {};
+            const myEntries = [];
+            for await (const [myEntryName, myEntryHandle] of myAgentDirHandle.entries()) {
+                if (myEntryHandle.kind !== 'file') continue;
+                myFileHandleMap[myEntryName] = myEntryHandle;
+                myEntries.push(myEntryName);
+            }
+            myEntries.sort();
+
+            document.getElementById("myFileCountLabel").innerText = myEntries.length;
+
+            const myListContainer = document.getElementById("myFileListContainer");
+            if (myEntries.length === 0) {
+                myListContainer.innerHTML = `<div style="padding:10px; color:#777; font-size:0.85rem;">No files found in this folder yet.</div>`;
+                return;
+            }
+
+            // myDeriveVarName is the SAME function myResolvePromptTemplate uses, so
+            // whatever token is shown here is guaranteed to resolve correctly if
+            // pasted into the base prompt as ${token}.
+            myListContainer.innerHTML = myEntries.map((myName) => {
+                const myVarToken = '${' + myDeriveVarName(myName) + '}';
+                const myEscapedName = myName.replace(/'/g, "\\'");
+                const myEscapedToken = myVarToken.replace(/'/g, "\\'");
+                return `
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid #222; font-size:0.82rem;">
+                        <span style="color:#4caf50; min-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" title="Click to copy ${myVarToken}" onclick="myCopyVarToken('${myEscapedToken}')">${myVarToken}</span>
+                        <span style="color:#e0e0e0; flex-grow:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${myName}</span>
+                        <button class="my-btn" style="margin:0; padding:4px 10px;" onclick="myEditFileByName('${myEscapedName}')">Edit</button>
+                        <button class="my-btn" style="margin:0; padding:4px 10px; background:#4a1f1f; border-color:#6a2f2f;" onclick="myDeleteFileByName('${myEscapedName}')">Delete</button>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.myCopyVarToken = async (myToken) => {
+            try {
+                await navigator.clipboard.writeText(myToken);
+                myUpdateTerminalView(`\n[Agent Log]: Copied "${myToken}" to clipboard — paste it into the base prompt.`, true);
+            } catch (myErr) {
+                myUpdateTerminalView(`\n[Agent Log]: Clipboard copy failed: ${myErr.message}`, true);
+            }
+        };
+
+        window.myEditFileByName = async (myName) => {
+            const myHandle = myFileHandleMap[myName];
+            if (!myHandle) {
+                myUpdateTerminalView(`\n[Agent Log]: File "${myName}" no longer found — click Refresh File List.`, true);
+                return;
+            }
+            const myFile = await myHandle.getFile();
+            const myText = await myFile.text();
+
+            document.getElementById("myFileEditArea").value = myText;
+            document.getElementById("myCurrentEditingFileNameInput").value = myName;
+            document.getElementById("mySaveFileEditBtn").disabled = false;
+            document.getElementById("mySaveStatusLabel").innerText = "";
+            myCurrentEditingFileName = myName;
+        };
+
+        window.myDeleteFileByName = async (myName) => {
+            if (!myAgentDirHandle) return;
+            const myConfirmed = window.confirm(`Delete "${myName}"? This cannot be undone.`);
+            if (!myConfirmed) return;
+
+            try {
+                await myAgentDirHandle.removeEntry(myName);
+                myUpdateTerminalView(`\n[Agent Log]: Deleted "${myName}".`, true);
+
+                if (myCurrentEditingFileName === myName) {
+                    myCurrentEditingFileName = null;
+                    document.getElementById("myFileEditArea").value = "";
+                    document.getElementById("myCurrentEditingFileNameInput").value = "";
+                    document.getElementById("mySaveFileEditBtn").disabled = true;
+                }
+                await myRefreshFileList();
+            } catch (myErr) {
+                myUpdateTerminalView(`\n[Agent Log]: Could not delete "${myName}": ${myErr.message}`, true);
+            }
+        };
+
+        // Saving with the name unchanged just writes content in place. Saving
+        // with a changed name renames the file — this is how the derived
+        // ${var} token gets edited, since it's always derived from the
+        // filename. The File System Access API has no native rename, so this
+        // is create-new + write + delete-old, same pattern used elsewhere.
+        window.mySaveCurrentFileEdit = async () => {
+            if (!myCurrentEditingFileName || !myFileHandleMap[myCurrentEditingFileName]) {
+                myUpdateTerminalView(`\n[Agent Log]: No file currently loaded for editing.`, true);
+                return;
+            }
+
+            const myNewName = document.getElementById("myCurrentEditingFileNameInput").value.trim();
+            const myNewContent = document.getElementById("myFileEditArea").value;
+
+            if (!myNewName) {
+                myUpdateTerminalView(`\n[Agent Log]: File name cannot be empty.`, true);
+                return;
+            }
+
+            try {
+                if (myNewName === myCurrentEditingFileName) {
+                    const myHandle = myFileHandleMap[myCurrentEditingFileName];
+                    const myWritable = await myHandle.createWritable();
+                    await myWritable.write(myNewContent);
+                    await myWritable.close();
+
+                    document.getElementById("mySaveStatusLabel").innerText = `Saved at ${new Date().toLocaleTimeString()}`;
+                    myUpdateTerminalView(`\n[Agent Log]: Saved edits to "${myCurrentEditingFileName}".`, true);
+                } else {
+                    const myNewHandle = await myAgentDirHandle.getFileHandle(myNewName, { create: true });
+                    const myNewWritable = await myNewHandle.createWritable();
+                    await myNewWritable.write(myNewContent);
+                    await myNewWritable.close();
+                    await myAgentDirHandle.removeEntry(myCurrentEditingFileName);
+
+                    document.getElementById("mySaveStatusLabel").innerText = `Renamed & saved at ${new Date().toLocaleTimeString()}`;
+                    myUpdateTerminalView(`\n[Agent Log]: Renamed "${myCurrentEditingFileName}" -> "${myNewName}" (variable is now \${${myDeriveVarName(myNewName)}}) and saved.`, true);
+                    myCurrentEditingFileName = myNewName;
+                }
+                await myRefreshFileList();
+            } catch (myErr) {
+                myUpdateTerminalView(`\n[Agent Log]: Save/rename failed: ${myErr.message}`, true);
+            }
+        };
+
+        window.myCreateNewFile = async () => {
+            if (!myAgentDirHandle) {
+                myUpdateTerminalView(`\n[Agent Log]: Select a folder first.`, true);
+                return;
+            }
+            const myNewNameInput = document.getElementById("myNewFileNameInput");
+            const myNewName = myNewNameInput.value.trim();
+            if (!myNewName) {
+                myUpdateTerminalView(`\n[Agent Log]: Enter a file name before creating.`, true);
+                return;
+            }
+
+            const myNewHandle = await myAgentDirHandle.getFileHandle(myNewName, { create: true });
+            const myWritable = await myNewHandle.createWritable();
+            await myWritable.write('');
+            await myWritable.close();
+
+            myNewNameInput.value = '';
+            myUpdateTerminalView(`\n[Agent Log]: Created empty file "${myNewName}".`, true);
+            await myRefreshFileList();
+            await myEditFileByName(myNewName);
+        };
+
+        window.myToggleAgentLoop = () => {
+            const myBtn = document.getElementById("myLoopToggleBtn");
+            const myStatusLabel = document.getElementById("myLoopStatusLabel");
+
+            if (myAgentLoopRunning) {
+                clearInterval(myAgentLoopIntervalId);
+                myAgentLoopRunning = false;
+                myBtn.innerText = "Start Watch Loop";
+                myBtn.classList.remove("my-btn-active");
+                myStatusLabel.innerText = "stopped";
+                myStatusLabel.style.color = "#ffc107";
+                myUpdateTerminalView(`\n[Agent Log]: Watch loop stopped.`, true);
+                return;
+            }
+
+            if (!myAgentDirHandle) {
+                myUpdateTerminalView(`\n[Agent Log]: Select a folder first.`, true);
+                return;
+            }
+            if (!myActiveConversation) {
+                myUpdateTerminalView(`\n[Agent Log]: Compile & Instantiate the local engine first.`, true);
+                return;
+            }
+
+            const myPollMs = parseInt(document.getElementById("myPollIntervalInput").value, 10) || 4000;
+            myAgentLoopRunning = true;
+            myBtn.innerText = "Stop Watch Loop";
+            myBtn.classList.add("my-btn-active");
+            myStatusLabel.innerText = "running";
+            myStatusLabel.style.color = "#4caf50";
+            myUpdateTerminalView(`\n[Agent Log]: Watch loop started (poll every ${myPollMs}ms). This single click authorized the tab to read/write the folder without further prompts for the rest of the session.`, true);
+
+            myAgentLoopIntervalId = setInterval(myProcessAgentFolderOnce, myPollMs);
+            myProcessAgentFolderOnce();
+        };
+    </script>
+</body>
+</html>
