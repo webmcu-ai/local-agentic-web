@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v008</title>
+<title>Ollama Local AI + Agent — v009</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -1116,7 +1116,7 @@ console.log("hi");</pre>
     </div>
 </div>
 
-<!-- Coding Agent Panel (v008) -->
+<!-- Coding Agent Panel (v009) -->
 <div class="my-tools-panel">
     <div class="my-tools-header" onclick="window.myAgTogglePanel()">
         <div class="my-tools-header-left"><span>🤖</span><span>Coding Agent: tools, workspace, ESP32 pins, Web Serial</span></div>
@@ -1176,7 +1176,7 @@ console.log("hi");</pre>
 </div>
 
 <div class="my-footer">
-    index-agentic-v008.html · all inference runs locally · no data leaves your machine
+    index-agentic-v009.html · all inference runs locally · no data leaves your machine
 </div>
 
 <!-- Webcam Modal -->
@@ -2498,6 +2498,10 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
         myMessages.push(...myConversationHistory);
 
         let myFullResponse = '';
+        let myStartTime = performance.now();
+        let myTokenCount = 0;
+        let myOllamaStats = null;
+        let myFailed = false;
         myCurrentAbortController = new AbortController();
 
         try {
@@ -2527,6 +2531,7 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
                     if (myChunk && myChunk.content) {
                         for (const myItem of myChunk.content) {
                             if (myItem.type === 'text') {
+                                myTokenCount++;
                                 myFullResponse += myItem.text;
                                 myAiTextEl.innerHTML = myLinkifyText(myFullResponse);
                                 if (myAutoScroll && myAutoScroll.checked) {
@@ -2572,7 +2577,11 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
                     for (const myLine of myLines) {
                         try {
                             const myJson = JSON.parse(myLine);
+                            if (myJson.done && myJson.eval_count) {
+                                myOllamaStats = { count: myJson.eval_count, durationNs: myJson.eval_duration };
+                            }
                             if (myJson.message?.content) {
+                                myTokenCount++;
                                 myFullResponse += myJson.message.content;
                                 myAiTextEl.innerHTML = myLinkifyText(myFullResponse);
                                 if (myAutoScroll && myAutoScroll.checked) {
@@ -2595,6 +2604,7 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
                 myStopNote.textContent = '■ Generation stopped by user.';
                 myThinkDiv.appendChild(myStopNote);
             } else if (myIsWebgpuBackend) {
+                myFailed = true;
                 myThinkDiv.innerHTML = `<div class="my-msg-label" style="color:var(--accent-red)">error</div>
                     <div class="my-msg-text" style="color:var(--accent-red)">
                     WebGPU engine error: ${myEscapeHtml(myErr.message)}<br><br>
@@ -2603,6 +2613,7 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
                     </div>`;
                 myConversationHistory.pop();
             } else {
+                myFailed = true;
                 myThinkDiv.innerHTML = `<div class="my-msg-label" style="color:var(--accent-red)">error</div>
                     <div class="my-msg-text" style="color:var(--accent-red)">
                     Could not reach Ollama: ${myEscapeHtml(myErr.message)}<br><br>
@@ -2615,7 +2626,23 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
         } finally {
             // Unset running timer tracking intervals safely inside clear handler
             clearInterval(myThinkInterval);
+            const myTotalSec = (performance.now() - myStartTime) / 1000;
             myToolbarTimer.textContent = `completed in ${mySecondsElapsed}s`;
+
+            if (myFullResponse && !myFailed) {
+                // Prefer Ollama's exact numbers; otherwise count streamed chunks (approx. tokens)
+                const myTokens = myOllamaStats ? myOllamaStats.count : myTokenCount;
+                const myGenSec = (myOllamaStats && myOllamaStats.durationNs) ? myOllamaStats.durationNs / 1e9 : myTotalSec;
+                const myTps = myGenSec > 0 ? (myTokens / myGenSec).toFixed(1) : '0';
+                const myApprox = myOllamaStats ? '' : '~';
+                const myStatsNote = document.createElement('div');
+                myStatsNote.style.color = 'var(--text-muted, #888)';
+                myStatsNote.style.fontSize = '0.72rem';
+                myStatsNote.style.fontFamily = 'var(--font-mono)';
+                myStatsNote.style.marginTop = '4px';
+                myStatsNote.textContent = `⏱ ${myTotalSec.toFixed(1)}s total · ${myApprox}${myTokens} tokens · ${myApprox}${myTps} tok/s`;
+                myThinkDiv.appendChild(myStatsNote);
+            }
             // Fade out timer after 4 seconds
             setTimeout(() => { myToolbarTimer.style.display = 'none'; }, 4000);
 
