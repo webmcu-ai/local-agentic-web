@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v009</title>
+<title>Ollama Local AI + Agent — v011</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -993,8 +993,8 @@
                 Folder: <strong id="myFolderNameLabel" style="color:var(--accent-green);">none selected</strong>
                 &nbsp;|&nbsp; Loop status: <strong id="myLoopStatusLabel" style="color:var(--accent-orange);">stopped</strong>
                 &nbsp;|&nbsp; <span id="myAgentTimerWrapper" style="display:none;">Working: <strong id="myAgentTimer" style="color:var(--accent-blue);">0.0s</strong>&nbsp;|&nbsp;</span>
-                Poll interval (ms):
-                <input type="number" id="myPollIntervalInput" value="4000" min="1000" step="500"
+                Pause after each pass (ms):
+                <input type="number" id="myPollIntervalInput" value="1000" min="0" step="500"
                        style="width: 90px; padding: 4px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); font-family: var(--font-mono); border-radius: var(--radius);">
             </div>
 
@@ -1116,7 +1116,7 @@ console.log("hi");</pre>
     </div>
 </div>
 
-<!-- Coding Agent Panel (v009) -->
+<!-- Coding Agent Panel (v011) -->
 <div class="my-tools-panel">
     <div class="my-tools-header" onclick="window.myAgTogglePanel()">
         <div class="my-tools-header-left"><span>🤖</span><span>Coding Agent: tools, workspace, ESP32 pins, Web Serial</span></div>
@@ -1176,7 +1176,7 @@ console.log("hi");</pre>
 </div>
 
 <div class="my-footer">
-    index-agentic-v009.html · all inference runs locally · no data leaves your machine
+    index-agentic-v011.html · all inference runs locally · no data leaves your machine
 </div>
 
 <!-- Webcam Modal -->
@@ -3121,7 +3121,7 @@ exactly as shown for every file.`;
             const myFile = await myFh.getFile();
             const myConfig = JSON.parse(await myFile.text());
             if (myConfig.basePrompt) document.getElementById('myConfigBasePromptInput').value = myConfig.basePrompt;
-            if (myConfig.pollIntervalMs) document.getElementById('myPollIntervalInput').value = myConfig.pollIntervalMs;
+            if (myConfig.pollIntervalMs !== undefined) document.getElementById('myPollIntervalInput').value = myConfig.pollIntervalMs;
             if (myConfig.maxGenerations) document.getElementById('myMaxGenerationsInput').value = myConfig.maxGenerations;
             if (typeof myConfig.autoChain === 'boolean') document.getElementById('myAutoChainToggle').checked = myConfig.autoChain;
             if (myConfig.inputMode) {
@@ -3145,7 +3145,7 @@ exactly as shown for every file.`;
         if (!myAgentDirHandle) { alert('Select an agent folder first.'); return; }
         const myConfig = {
             basePrompt: document.getElementById('myConfigBasePromptInput').value,
-            pollIntervalMs: parseInt(document.getElementById('myPollIntervalInput').value, 10) || 4000,
+            pollIntervalMs: myAgentGetPauseMs(),
             maxGenerations: parseInt(document.getElementById('myMaxGenerationsInput').value, 10) || 5,
             autoChain: document.getElementById('myAutoChainToggle').checked,
             inputMode: document.querySelector('input[name="myInputModeRadio"]:checked').value,
@@ -3167,11 +3167,25 @@ exactly as shown for every file.`;
         }
     };
 
+    const myAgentGetPauseMs = () => {
+        const myV = parseInt(document.getElementById('myPollIntervalInput').value, 10);
+        return isNaN(myV) || myV < 0 ? 1000 : myV;
+    };
+
+    // Each pass starts only after the previous one has finished plus the pause,
+    // so the pause no longer has to be longer than the slowest model run.
+    const myAgentLoopTick = async () => {
+        if (!myAgentLoopActive) return;
+        await window.myProcessAgentFolderOnce();
+        if (!myAgentLoopActive) return;
+        myAgentLoopTimerId = setTimeout(myAgentLoopTick, myAgentGetPauseMs());
+    };
+
     window.myToggleAgentLoop = () => {
         const myBtn = document.getElementById('myLoopToggleBtn');
         const myStatusLabel = document.getElementById('myLoopStatusLabel');
         if (myAgentLoopActive) {
-            clearInterval(myAgentLoopTimerId);
+            clearTimeout(myAgentLoopTimerId);
             myAgentLoopTimerId = null;
             myAgentLoopActive = false;
             myBtn.textContent = 'Start Watch Loop';
@@ -3184,10 +3198,8 @@ exactly as shown for every file.`;
             myBtn.textContent = 'Stop Watch Loop';
             myStatusLabel.textContent = 'running';
             myStatusLabel.style.color = 'var(--accent-green)';
-            const myIntervalMs = parseInt(document.getElementById('myPollIntervalInput').value, 10) || 4000;
-            myAgentLog(`Watch loop started (every ${myIntervalMs}ms).`);
-            window.myProcessAgentFolderOnce();
-            myAgentLoopTimerId = setInterval(() => { window.myProcessAgentFolderOnce(); }, myIntervalMs);
+            myAgentLog(`Watch loop started (${myAgentGetPauseMs()}ms pause after each pass finishes).`);
+            myAgentLoopTick();
         }
     };
 
@@ -3242,10 +3254,38 @@ exactly as shown for every file.`;
         return myPrompt;
     };
 
+    // Token stats from the most recent myAgentAskModel call (Ollama reports exact numbers;
+    // WebGPU doesn't, so the job code estimates from text length).
+    let myAgentLastStats = null;
+
+    const myAgentFmtBytes = (myN) => myN < 1024 ? `${myN} B` : `${(myN / 1024).toFixed(1)} KB`;
+
+    // Posts a "folder agent" bubble into the main chat and returns an update function,
+    // so one bubble can go from "working…" to the final summary. These bubbles are
+    // display-only and are NOT added to the conversation history sent to the model.
+    const myAgentChatOpen = () => {
+        const myChatBox = document.getElementById('myChatBox');
+        const myEmpty = document.getElementById('myEmptyState');
+        if (myEmpty) myEmpty.remove();
+        const myDiv = document.createElement('div');
+        myDiv.className = 'my-msg ai';
+        myDiv.innerHTML = '<div class="my-msg-label">folder agent</div>';
+        const myText = document.createElement('div');
+        myText.className = 'my-msg-text';
+        myDiv.appendChild(myText);
+        myChatBox.appendChild(myDiv);
+        return (myLines) => {
+            myText.innerHTML = myLines.map(myEscapeHtml).join('<br>');
+            const myAuto = document.getElementById('myAutoScrollCheck');
+            if (myAuto && myAuto.checked) myChatBox.scrollTop = myChatBox.scrollHeight;
+        };
+    };
+
     // Calls whichever backend is currently active (Ollama server, or the local
     // WebGPU engine) once, non-streaming, and returns the full text. Uses the
     // same Model / Context Window / System Prompt fields as the main chat UI.
     const myAgentAskModel = async (myPromptText) => {
+        myAgentLastStats = null;
         if (myBackendMode === 'webgpu') {
             return await myWebgpuAskOnce(myPromptText);
         }
@@ -3272,6 +3312,13 @@ exactly as shown for every file.`;
             throw new Error(myErrText || `HTTP ${myResp.status}`);
         }
         const myData = await myResp.json();
+        if (myData.eval_count) {
+            myAgentLastStats = {
+                tokens: myData.eval_count,
+                promptTokens: myData.prompt_eval_count || 0,
+                genSec: myData.eval_duration ? myData.eval_duration / 1e9 : 0
+            };
+        }
         return (myData.message && myData.message.content) ? myData.message.content.trim() : '';
     };
 
@@ -3360,12 +3407,18 @@ exactly as shown for every file.`;
         const myMode = document.querySelector('input[name="myInputModeRadio"]:checked').value;
         const myMultiFileEnabled = document.getElementById('myMultiFileOutputToggle').checked;
         let myProcessedAny = false;
+        const myPassTotals = { jobs: 0, failed: 0, tokens: 0, files: 0, sec: 0 };
 
         // One shared "process a single job" routine used by all three modes, so
         // chaining/max-iteration/error-handling logic isn't duplicated three times.
-        const myRunOneJob = async (myJobKey, myGetContent, myWriteOutput, myWriteBackInput) => {
+        const myRunOneJob = async (myJobKey, myGetContent, myWriteOutput, myWriteBackInput, myDefaultOutName) => {
             const myIterSoFar = myAgentChainCounts[myJobKey] || 0;
             if (myIterSoFar >= myEffectiveMax) return;
+            let myChatUpdate = null;
+            const myWrittenFiles = [];
+            const myNotes = [];
+            let myBackupMade = '';
+            let myWroteBack = false;
             try {
                 const myContent = await myGetContent();
                 if (!myContent || !myContent.trim()) return;
@@ -3385,6 +3438,7 @@ exactly as shown for every file.`;
                         await myBackupWritable.write(myContent);
                         await myBackupWritable.close();
                         myAgentLog(`  backed up original input → ${myBackupName}`);
+                        myBackupMade = myBackupName;
                     } catch (myBackupErr) {
                         myAgentLog(`  could not write ${myBackupName}: ${myBackupErr.message}`);
                     }
@@ -3393,7 +3447,13 @@ exactly as shown for every file.`;
                 const myPrompt = await myAgentBuildPrompt(myTemplate, myJobKey, myContent, myIterSoFar + 1);
                 myAgentLog(`Processing ${myJobKey} (pass ${myIterSoFar + 1}/${myEffectiveMax})...`);
 
+                const myModelLabel = myBackendMode === 'webgpu' ? 'the WebGPU engine' : (document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL);
+                myChatUpdate = myAgentChatOpen();
+                myChatUpdate([`⚙ Working on ${myJobKey} — pass ${myIterSoFar + 1}/${myEffectiveMax}`, `Asking ${myModelLabel} (read ${myAgentFmtBytes(myContent.length)} of input)…`]);
+                const myJobStart = performance.now();
+
                 const myResult = await myAgentAskModel(myPrompt);
+                const myJobSec = (performance.now() - myJobStart) / 1000;
 
                 const myParsedFiles = myMultiFileEnabled ? myAgentParseMultiFileOutput(myResult) : null;
                 if (myParsedFiles && myParsedFiles.length > 0) {
@@ -3401,8 +3461,10 @@ exactly as shown for every file.`;
                         try {
                             await myAgentWriteNestedFile(myAgentDirHandle, myFileEntry.path, myFileEntry.content);
                             myAgentLog(`  wrote ${myFileEntry.path}`);
+                            myWrittenFiles.push(`${myFileEntry.path} (${myAgentFmtBytes(myFileEntry.content.length)})`);
                         } catch (myWriteErr) {
                             myAgentLog(`  skipped "${myFileEntry.path}": ${myWriteErr.message}`);
+                            myNotes.push(`skipped ${myFileEntry.path}: ${myWriteErr.message}`);
                         }
                     }
                     // Record what now exists so the NEXT pass's ${manifest} can tell
@@ -3415,13 +3477,18 @@ exactly as shown for every file.`;
                             await myAgentWriteNestedFile(myAgentDirHandle, myGuess.path, myGuess.content);
                             myAgentLog(`  no "=== FILE: name ===" marker found, but the model named itself "${myGuess.path}" — wrote that instead of the default output name.`);
                             await myAgentAppendManifest(myJobKey, [myGuess.path]);
+                            myWrittenFiles.push(`${myGuess.path} (${myAgentFmtBytes(myGuess.content.length)})`);
+                            myNotes.push('no FILE marker found, so the file name was guessed from the reply');
                         } catch (myWriteErr) {
                             myAgentLog(`  guessed name "${myGuess.path}" failed (${myWriteErr.message}) — writing to the default output name instead.`);
                             await myWriteOutput(myStripOuterMarkdownFence(myResult));
+                            myWrittenFiles.push(`${myDefaultOutName} (${myAgentFmtBytes(myResult.length)})`);
+                            myNotes.push(`guessed name "${myGuess.path}" failed, used the default output name`);
                         }
                     } else {
                         if (myMultiFileEnabled) myAgentLog('  no "=== FILE: name ===" markers found — writing as a single file instead.');
                         await myWriteOutput(myStripOuterMarkdownFence(myResult));
+                        myWrittenFiles.push(`${myDefaultOutName} (${myAgentFmtBytes(myResult.length)})`);
                     }
                 }
 
@@ -3436,13 +3503,42 @@ exactly as shown for every file.`;
                 // meant to become the latest draft each pass.
                 if (myAutoChain && myWriteBackInput && !(myMultiFileEnabled && myParsedFiles && myParsedFiles.length > 0)) {
                     await myWriteBackInput(myResult);
+                    myWroteBack = true;
                 }
 
                 myAgentChainCounts[myJobKey] = myIterSoFar + 1;
                 myAgentLog(`Finished ${myJobKey}.`);
                 myProcessedAny = true;
+
+                // ── Chat feedback ──
+                const myExact = !!myAgentLastStats;
+                const myTokens = myExact ? myAgentLastStats.tokens : Math.ceil(myResult.length / 4);
+                const myGenSec = (myExact && myAgentLastStats.genSec > 0) ? myAgentLastStats.genSec : myJobSec;
+                const myTps = myGenSec > 0 ? (myTokens / myGenSec).toFixed(1) : '0';
+                const myTilde = myExact ? '' : '~';
+                const myPromptPart = (myExact && myAgentLastStats.promptTokens) ? ` (prompt ${myAgentLastStats.promptTokens})` : '';
+                const myPreview = myResult.replace(/\s+/g, ' ').trim().slice(0, 100);
+                const myLines = [
+                    `✅ ${myJobKey} — pass ${myIterSoFar + 1}/${myEffectiveMax} finished in ${myJobSec.toFixed(1)}s`,
+                    `🔢 ${myTilde}${myTokens} tokens generated${myPromptPart} · ${myTilde}${myTps} tok/s`
+                ];
+                if (myWrittenFiles.length === 1) myLines.push(`📄 File written: ${myWrittenFiles[0]}`);
+                else if (myWrittenFiles.length > 1) myLines.push(`📄 ${myWrittenFiles.length} files written: ${myWrittenFiles.join(', ')}`);
+                if (myBackupMade) myLines.push(`💾 Original input backed up as ${myBackupMade}`);
+                if (myWroteBack) myLines.push(`↻ Input file updated with this result, ready for pass ${myIterSoFar + 2}`);
+                if (myMultiFileEnabled && myWrittenFiles.length > 0) myLines.push('📋 Manifest updated');
+                myNotes.forEach((myNote) => myLines.push(`⚠ ${myNote}`));
+                if (myPreview) myLines.push(`📝 Reply starts: ${myPreview}${myResult.length > 100 ? '…' : ''}`);
+                myChatUpdate(myLines);
+
+                myPassTotals.jobs++;
+                myPassTotals.tokens += myTokens;
+                myPassTotals.files += myWrittenFiles.length;
+                myPassTotals.sec += myJobSec;
             } catch (myJobErr) {
                 myAgentLog(`Error on ${myJobKey}: ${myJobErr.message}`);
+                (myChatUpdate || myAgentChatOpen())([`❌ ${myJobKey} failed: ${myJobErr.message}`]);
+                myPassTotals.failed++;
             }
         };
 
@@ -3459,7 +3555,8 @@ exactly as shown for every file.`;
                         await myWritable.write(myResult);
                         await myWritable.close();
                     },
-                    async (myResult) => { document.getElementById('myUserInput').value = myResult; }
+                    async (myResult) => { document.getElementById('myUserInput').value = myResult; },
+                    myOutName
                 );
 
             } else if (myMode === 'named') {
@@ -3489,7 +3586,8 @@ exactly as shown for every file.`;
                         const myInWritable = await myFh.createWritable();
                         await myInWritable.write(myResult);
                         await myInWritable.close();
-                    }
+                    },
+                    myOutName
                 );
 
             } else {
@@ -3515,7 +3613,8 @@ exactly as shown for every file.`;
                             const myInWritable = await myFh.createWritable();
                             await myInWritable.write(myResult);
                             await myInWritable.close();
-                        }
+                        },
+                        `${myBaseName}.out.txt`
                     );
                 }
             }
@@ -3524,6 +3623,12 @@ exactly as shown for every file.`;
         } finally {
             myAgentProcessingInFlight = false;
             myAgentStopTimer();
+            if (myPassTotals.jobs + myPassTotals.failed > 1) {
+                myAgentChatOpen()([
+                    `📊 Pass complete: ${myPassTotals.jobs} job(s) done${myPassTotals.failed ? `, ${myPassTotals.failed} failed` : ''}`,
+                    `🔢 ${myPassTotals.tokens} tokens · ⏱ ${myPassTotals.sec.toFixed(1)}s · 📄 ${myPassTotals.files} file(s) written`
+                ]);
+            }
             if (myProcessedAny) await window.myRefreshFileList();
         }
     };
