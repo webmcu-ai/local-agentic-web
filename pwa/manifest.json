@@ -1,7 +1,7 @@
 {
-  "name": "local-gemma4-pwa",
-  "short_name": "gemma4",
-  "start_url": "/local-gemma4-pwa/index.html",
+  "name": "local-agentic-web",
+  "short_name": "agentic",
+  "start_url": "/local-agentic-web/index.html",
   "display": "standalone",
   "background_color": "#1e1e2e",
   "theme_color": "#22B14C",
