@@ -1,5 +1,5 @@
 // sw.js
-const myCacheName = "local-agentic-web";
+const myCacheName = "local-agentic-web-v015";
 const myAssetsToCache = [
   "./",
   "./index.html",
