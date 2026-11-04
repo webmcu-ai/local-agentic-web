@@ -1,6 +1,30 @@
 old files here
 
 
+When making changes update the const myCacheName version
+
+
+```
+// sw.js
+const myCacheName = "local-agentic-web-v002"; // Increment this when you update your app files
+const myAssetsToCache = [
+  "./",
+  "./index.html",
+  "./pwa/manifest.json",
+  "./pwa/pwa.js",
+  "./pwa/icon-192.png",
+  "./pwa/icon-512.png"
+];
+
+
+```
+
+
+
+
+
+
+
 
 If changing the PWA make sure to 
 
