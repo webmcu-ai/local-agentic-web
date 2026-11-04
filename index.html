@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v011</title>
+<title>Ollama Local AI + Agent — v012</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -970,7 +970,10 @@
     <div class="my-tools-body" id="myAgentPanelBody">
 
         <div>
-            <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 10px;">
+            <details style="margin-bottom: 12px;">
+                <summary style="cursor:pointer; font-size:0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">Help: how this panel works, multi-file output, file variables</summary>
+                <div style="margin-top: 8px;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 10px;">
                 "Select / Create Agent Folder" needs one click (browser security requirement for
                 <code>showDirectoryPicker</code>). After that, everything below — reading files,
                 calling Ollama, writing outputs, chaining passes — runs with <b>no further clicks</b>,
@@ -980,24 +983,61 @@
                 top-right — the local Ollama server at <code>http://localhost:11434</code>, or the
                 in-browser WebGPU engine once it's compiled — using the Model / System Prompt set above.
             </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
+                    When checked, the model's response is scanned for markers like this and each block is written to
+                    its own file (subfolders like <code>css/style.css</code> are created automatically):
+                    <pre style="background:var(--bg-base); border:1px solid var(--border); border-radius: var(--radius); padding:6px 8px; margin:6px 0; white-space:pre-wrap; color: var(--accent-blue);">=== FILE: index.html ===
+&lt;!DOCTYPE html&gt;...
 
-            <div class="my-btn-row" style="margin-bottom: 12px;">
+=== FILE: css/style.css ===
+body { ... }
+
+=== FILE: script.js ===
+console.log("hi");</pre>
+                    Your base prompt below needs to actually instruct the model to respond in this format — the
+                    toggle only controls how the response gets <i>parsed</i>, it doesn't change what the model writes.
+                    If no markers are found in a response, it falls back to writing the whole thing as one file.
+                    The three names above are just an <i>example</i> of the marker syntax — the parser doesn't care
+                    what the names are or how many files there are. If you want the model to invent its own filenames
+                    and file count, say so explicitly in the base prompt; it won't do that on its own just because the
+                    toggle is checked. Click "Load creative example" below for a starter prompt written that way.
+                </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
+                <b style="color:var(--text-secondary);">File variables:</b> write <code>${input}</code>, <code>${filename}</code>,
+                <code>${iteration}</code>, <code>${original}</code>, or <code>${manifest}</code> anywhere in the prompt above
+                to reference the file currently being processed. Any other <code>${name}</code> is looked up against the
+                other files sitting in the folder right now — e.g. <code>${sensor1}</code> pulls in the live content of
+                <code>sensor1.in.txt</code>.
+                <br><b style="color:var(--text-secondary);">${original}</b> is special: on first processing, each job's starting
+                content is snapshotted once to <code>&lt;name&gt;.backup.input.txt</code> (never overwritten again). <code>${original}</code>
+                always resolves to that snapshot, so even after many auto-chain passes have overwritten the live
+                <code>.in.txt</code> file, the model can still see what it was originally asked to do —
+                e.g. <code>Original request: ${original}\nLatest draft: ${input}\nImprove the draft while staying true to the original request.</code>
+                <br><b style="color:var(--text-secondary);">${manifest}</b> is for additive multi-file chains ("make one more file
+                each pass"): it lists every file this job has written so far (<code>&lt;name&gt;.manifest.txt</code>), so the model
+                can be told what already exists and add something new instead of re-generating or overwriting it. When multi-file
+                output + auto-chain are both on, the live <code>.in.txt</code> is deliberately left untouched pass to pass (see the
+                "Load Creative Multi-File Example" button) — progress is tracked via <code>${manifest}</code> +
+                <code>${iteration}</code> instead of mutating the input.
+            </div>
+                </div>
+            </details>
+
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px; font-family: var(--font-mono);">
+                Backend / model: <strong id="myAgentModelLabel" style="color:var(--accent-blue);">-</strong>
+            </div>
+
+            <div class="my-section-label">1 · Folder</div>
+            <div class="my-btn-row" style="margin-bottom: 8px;">
                 <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myPickAgentFolder()">Select / Create Agent Folder</button>
                 <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myRelinkAgentFolder()">Relink Last Folder</button>
                 <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myWriteConfigToFolder()">Save config.json</button>
-                <button class="my-btn my-btn-primary my-btn-sm" id="myLoopToggleBtn" onclick="window.myToggleAgentLoop()">Start Watch Loop</button>
-                <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myProcessAgentFolderOnce()">Run Once (Manual Scan)</button>
             </div>
-
-            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 10px; font-family: var(--font-mono);">
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 14px; font-family: var(--font-mono);">
                 Folder: <strong id="myFolderNameLabel" style="color:var(--accent-green);">none selected</strong>
-                &nbsp;|&nbsp; Loop status: <strong id="myLoopStatusLabel" style="color:var(--accent-orange);">stopped</strong>
-                &nbsp;|&nbsp; <span id="myAgentTimerWrapper" style="display:none;">Working: <strong id="myAgentTimer" style="color:var(--accent-blue);">0.0s</strong>&nbsp;|&nbsp;</span>
-                Pause after each pass (ms):
-                <input type="number" id="myPollIntervalInput" value="1000" min="0" step="500"
-                       style="width: 90px; padding: 4px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); font-family: var(--font-mono); border-radius: var(--radius);">
             </div>
 
+            <div class="my-section-label" style="margin-top:14px;">2 · Input</div>
             <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px; font-family: var(--font-mono);">
                 <label style="display:block; font-weight:600; color: var(--text-primary); margin-bottom:6px;">Input source:</label>
                 <div style="display:flex; flex-direction:column; gap:6px;">
@@ -1017,32 +1057,16 @@
                 </div>
             </div>
 
+            <div class="my-section-label" style="margin-top:14px;">3 · Prompt</div>
             <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px; font-family: var(--font-mono);">
                 <label style="cursor:pointer;">
                     <input type="checkbox" id="myMultiFileOutputToggle" style="cursor:pointer; accent-color: var(--accent-green);">
                     Multi-file output: split the response into several named files instead of writing it as one file
                 </label>
                 <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
-                    When checked, the model's response is scanned for markers like this and each block is written to
-                    its own file (subfolders like <code>css/style.css</code> are created automatically):
-                    <pre style="background:var(--bg-base); border:1px solid var(--border); border-radius: var(--radius); padding:6px 8px; margin:6px 0; white-space:pre-wrap; color: var(--accent-blue);">=== FILE: index.html ===
-&lt;!DOCTYPE html&gt;...
-
-=== FILE: css/style.css ===
-body { ... }
-
-=== FILE: script.js ===
-console.log("hi");</pre>
-                    Your base prompt below needs to actually instruct the model to respond in this format — the
-                    toggle only controls how the response gets <i>parsed</i>, it doesn't change what the model writes.
-                    If no markers are found in a response, it falls back to writing the whole thing as one file.
-                    The three names above are just an <i>example</i> of the marker syntax — the parser doesn't care
-                    what the names are or how many files there are. If you want the model to invent its own filenames
-                    and file count, say so explicitly in the base prompt; it won't do that on its own just because the
-                    toggle is checked. Click "Load creative example" below for a starter prompt written that way.
+                    Your prompt must tell the model to answer with "=== FILE: name ===" markers. See Help above.
                 </div>
             </div>
-
             <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px; display:flex; align-items:center; gap:20px; flex-wrap:wrap; font-family: var(--font-mono);">
                 <span style="display:flex; align-items:center; gap:8px;">
                     Max auto-chain iterations (same file):
@@ -1054,30 +1078,24 @@ console.log("hi");</pre>
                     <label for="myAutoChainToggle" style="cursor:pointer; user-select:none;">Auto-chain: overwrite .in.txt (or the message box) with the new output for the next pass</label>
                 </span>
             </div>
-
             <div class="my-section-label">config.json base prompt (editable here, written to disk on "Save config.json")
                 <button class="my-btn" style="padding:2px 8px; font-size:0.7rem; float:right;" onclick="myLoadCreativePromptExample()">Load creative multi-file example</button>
             </div>
             <textarea id="myConfigBasePromptInput" rows="3"
                       style="width: 100%; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); font-family: var(--font-mono); padding: 8px; box-sizing: border-box; resize: vertical; border-radius: var(--radius);">Read ${input} and produce a concise, improved version that adds a short paragraph better explaining the input. Return only the final output text — no preamble, no commentary, no markdown fences.</textarea>
 
-            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
-                <b style="color:var(--text-secondary);">File variables:</b> write <code>${input}</code>, <code>${filename}</code>,
-                <code>${iteration}</code>, <code>${original}</code>, or <code>${manifest}</code> anywhere in the prompt above
-                to reference the file currently being processed. Any other <code>${name}</code> is looked up against the
-                other files sitting in the folder right now — e.g. <code>${sensor1}</code> pulls in the live content of
-                <code>sensor1.in.txt</code>.
-                <br><b style="color:var(--text-secondary);">${original}</b> is special: on first processing, each job's starting
-                content is snapshotted once to <code>&lt;name&gt;.backup.input.txt</code> (never overwritten again). <code>${original}</code>
-                always resolves to that snapshot, so even after many auto-chain passes have overwritten the live
-                <code>.in.txt</code> file, the model can still see what it was originally asked to do —
-                e.g. <code>Original request: ${original}\nLatest draft: ${input}\nImprove the draft while staying true to the original request.</code>
-                <br><b style="color:var(--text-secondary);">${manifest}</b> is for additive multi-file chains ("make one more file
-                each pass"): it lists every file this job has written so far (<code>&lt;name&gt;.manifest.txt</code>), so the model
-                can be told what already exists and add something new instead of re-generating or overwriting it. When multi-file
-                output + auto-chain are both on, the live <code>.in.txt</code> is deliberately left untouched pass to pass (see the
-                "Load Creative Multi-File Example" button) — progress is tracked via <code>${manifest}</code> +
-                <code>${iteration}</code> instead of mutating the input.
+            <div class="my-section-label" style="margin-top:14px;">4 · Run</div>
+            <div class="my-btn-row" style="margin-bottom: 8px;">
+                <button class="my-btn my-btn-primary my-btn-sm" id="myLoopToggleBtn" onclick="window.myToggleAgentLoop()">Start Watch Loop</button>
+                <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myProcessAgentFolderOnce()">Run Once (Manual Scan)</button>
+                <button class="my-btn my-btn-danger my-btn-sm" onclick="window.myAgentStop()">■ Stop</button>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; font-family: var(--font-mono);">
+                Loop status: <strong id="myLoopStatusLabel" style="color:var(--accent-orange);">stopped</strong>
+                &nbsp;|&nbsp; <span id="myAgentTimerWrapper" style="display:none;">Working: <strong id="myAgentTimer" style="color:var(--accent-blue);">0.0s</strong>&nbsp;|&nbsp;</span>
+                Pause after each pass (ms):
+                <input type="number" id="myPollIntervalInput" value="1000" min="0" step="500"
+                       style="width: 90px; padding: 4px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); font-family: var(--font-mono); border-radius: var(--radius);">
             </div>
         </div>
 
@@ -1116,22 +1134,30 @@ console.log("hi");</pre>
     </div>
 </div>
 
-<!-- Coding Agent Panel (v011) -->
+<!-- Coding Agent Panel (v012) -->
 <div class="my-tools-panel">
     <div class="my-tools-header" onclick="window.myAgTogglePanel()">
-        <div class="my-tools-header-left"><span>🤖</span><span>Coding Agent: tools, workspace, ESP32 pins, Web Serial</span></div>
+        <div class="my-tools-header-left"><span>🤖</span><span>Coding Agent: tools, coding folder, ESP32 pins, Web Serial</span><span id="myAgBadge" title="proposals waiting" style="display:none;background:#e65100;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.7rem;margin-left:8px;">0</span></div>
         <span class="my-setup-toggle" id="myAgPanelLabel">▼ show</span>
     </div>
     <div class="my-tools-body" id="myAgPanelBody">
         <div style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">Uses the backend chosen at the top (Ollama or WebGPU) and the model set above. Writes are only proposals you approve. The agent cannot compile, flash or run code. Serial needs Chrome/Edge on https or localhost.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+            <button class="my-btn my-btn-secondary my-btn-sm" onclick="myPickCodeFolder()">Select / Create Coding Folder</button>
+            <button class="my-btn my-btn-secondary my-btn-sm" onclick="myRelinkCodeFolder()">Relink Last Coding Folder</button>
+            <button class="my-btn my-btn-green my-btn-sm" id="myAgDemoBtn" onclick="myCreateDemoFiles()" disabled>Create demo files</button>
+            <span style="font-size:0.75rem;font-family:var(--font-mono);">Coding folder: <strong id="myAgFolderLabel" style="color:var(--accent-green);">none selected</strong></span>
+        </div>
+        <div id="myAgFolderHint" style="font-size:0.78rem;color:var(--accent-orange);font-family:var(--font-mono);">Pick a coding folder to begin</div>
         <div>
             <select id="myAgPreset" onchange="myAgPickPreset()" aria-label="Agent preset" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"></select>
             <select id="myAgModelPick" onchange="myAgPickModel()" aria-label="Suggested Ollama models" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"><option value="">Suggested Ollama models (pull first)</option></select>
             ctx <select id="myAgCtx" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"><option>4096</option><option selected>8192</option><option>16384</option></select>
-            loops <input id="myAgMaxLoops" type="number" value="8" min="1" max="20" style="width:48px;" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
-            tokens <input id="myAgMaxTokens" type="number" value="1024" min="64" max="8192" style="width:70px;" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
+            loops <input id="myAgMaxLoops" type="number" value="8" min="1" max="20" style="width:48px;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
+            tokens <input id="myAgMaxTokens" type="number" value="1024" min="64" max="8192" style="width:70px;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
         </div>
         <div><span id="myAgProviderStatus" style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">not checked yet</span></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">Backend: <strong id="myAgBackendLabel" style="color:var(--accent-blue);">-</strong> · step <strong id="myAgStepLabel">0/0</strong> · time <strong id="myAgTimerLabel">0.0s</strong></div>
         <textarea id="myAgTask" rows="3" aria-label="Agent task" onkeydown="if(event.ctrlKey&&event.key==='Enter')myRunAgentLoop()" style="width:100%;box-sizing:border-box;background:var(--bg-base);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);font-size:0.75rem;">Read src/main.ino, check the pins against the board profile, and propose a fix for any problem.</textarea>
         <div>
             <button class="my-btn my-btn-primary my-btn-sm" id="myAgRunBtn" onclick="myRunAgentLoop()">▶ Run Agent (Ctrl+Enter)</button>
@@ -1142,12 +1168,11 @@ console.log("hi");</pre>
         <div id="myAgLog" style="max-height:40vh;overflow-y:auto;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.72rem;"></div>
         <div id="myAgProposals"></div>
         <div>
-            <b style="font-size:0.75rem;">Workspace</b>
-            <select id="myAgWsMode" onchange="myAgRefreshFiles()" aria-label="Workspace mode" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"><option value="virtual">Virtual sample project (in memory)</option><option value="folder">Linked agent folder (real files)</option></select>
+            <b style="font-size:0.75rem;">Files in coding folder</b>
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="myAgRefreshFiles()">↻ Refresh</button>
         </div>
         <select id="myAgFileList" size="5" aria-label="Files" onchange="myAgOpenFile()" style="width:100%;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"></select>
-        <input id="myAgFilePath" placeholder="path e.g. src/new.ino" style="width:50%;" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
+        <input id="myAgFilePath" placeholder="path e.g. src/new.ino" style="width:50%;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
         <textarea id="myAgFileText" rows="8" aria-label="File content" style="width:100%;box-sizing:border-box;background:var(--bg-base);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);font-size:0.75rem;"></textarea>
         <div><button class="my-btn my-btn-green my-btn-sm" onclick="myAgSaveEditor()">Propose change from editor</button></div>
         <details><summary style="cursor:pointer;font-size:0.75rem;">ESP32 board profile and pin check</summary>
@@ -1159,7 +1184,7 @@ console.log("hi");</pre>
   "strapping": {"0":"boot mode","2":"boot mode","5":"boot timing","12":"flash voltage","15":"boot log"},
   "peripherals": {"1":"UART0 TX","3":"UART0 RX","21":"I2C SDA default","22":"I2C SCL default"}
 }</textarea>
-            <input id="myAgPinTest" value='{"LED":2,"SDA":21,"BUTTON":34,"RELAY":6}' aria-label="Pins to test" style="width:60%;" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
+            <input id="myAgPinTest" value='{"LED":2,"SDA":21,"BUTTON":34,"RELAY":6}' aria-label="Pins to test" style="width:60%;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="myAgManualPinCheck()">Check pins</button>
             <div style="font-size:0.7rem;color:var(--text-muted);">Generic example profile; edit it for your board. A listed GPIO is not proof of electrical safety.</div>
         </details>
@@ -1168,7 +1193,7 @@ console.log("hi");</pre>
             <button class="my-btn my-btn-green my-btn-sm" onclick="mySerialConnect()">Connect</button>
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="mySerialDisconnect()">Disconnect</button>
             <div id="myAgSerialIn" style="height:15vh;overflow-y:auto;white-space:pre-wrap;background:var(--bg-base);border:1px solid var(--border);padding:6px;font-family:var(--font-mono);font-size:0.72rem;"></div>
-            <input id="myAgSerialOut" placeholder="text to send" onkeydown="if(event.key==='Enter')mySerialSend()" style="width:60%;" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
+            <input id="myAgSerialOut" placeholder="text to send" onkeydown="if(event.key==='Enter')mySerialSend()" style="width:60%;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="mySerialSend()">Send</button>
             <div style="font-size:0.7rem;color:var(--text-muted);">Text only. Nothing is flashed or sent automatically.</div>
         </details>
@@ -1176,7 +1201,7 @@ console.log("hi");</pre>
 </div>
 
 <div class="my-footer">
-    index-agentic-v011.html · all inference runs locally · no data leaves your machine
+    index-agentic-v012.html · all inference runs locally · no data leaves your machine
 </div>
 
 <!-- Webcam Modal -->
@@ -1274,6 +1299,8 @@ console.log("hi");</pre>
     let myAgentLoopTimerId = null;
     let myAgentActivityTimerId = null;
     let myAgentChainCounts = {};
+    let myAgentAbort = null;          // AbortController for the model call in flight
+    let myAgentStopRequested = false; // set by the Stop button
 
     // Every job (a named .in.txt file, one wildcard-matched .in.txt file, or the
     // live prompt box) gets one immutable backup of its very first content, so a
@@ -3181,16 +3208,44 @@ exactly as shown for every file.`;
         myAgentLoopTimerId = setTimeout(myAgentLoopTick, myAgentGetPauseMs());
     };
 
+    const myAgentSetLoopStopped = () => {
+        clearTimeout(myAgentLoopTimerId);
+        myAgentLoopTimerId = null;
+        myAgentLoopActive = false;
+        document.getElementById('myLoopToggleBtn').textContent = 'Start Watch Loop';
+        const myStatusLabel = document.getElementById('myLoopStatusLabel');
+        myStatusLabel.textContent = 'stopped';
+        myStatusLabel.style.color = 'var(--accent-orange)';
+    };
+
+    const myAgentStopError = () => {
+        const myErr = new Error('Stopped by user');
+        myErr.name = 'AbortError';
+        return myErr;
+    };
+
+    // Stop button: aborts the model call in flight and stops the watch loop.
+    // WebGPU engines without an abort function finish the call, but the result is thrown away.
+    window.myAgentStop = () => {
+        if (!myAgentProcessingInFlight && !myAgentLoopActive) {
+            myAgentLog('Stop: nothing is running.');
+            return;
+        }
+        myAgentStopRequested = true;
+        if (myAgentAbort) myAgentAbort.abort();
+        if (myBackendMode === 'webgpu' && myWebgpuConversation && myWebgpuConversation.abort) {
+            try { myWebgpuConversation.abort(); } catch (myErr) { /* ignore */ }
+        }
+        if (myAgentLoopActive) myAgentSetLoopStopped();
+        myAgentLog('Stop pressed: aborting the model call and stopping the watch loop.');
+        if (!myAgentProcessingInFlight) myAgentChatOpen()(['⏹ Folder agent stopped by user (the watch loop was stopped, no model call was running).']);
+    };
+
     window.myToggleAgentLoop = () => {
         const myBtn = document.getElementById('myLoopToggleBtn');
         const myStatusLabel = document.getElementById('myLoopStatusLabel');
         if (myAgentLoopActive) {
-            clearTimeout(myAgentLoopTimerId);
-            myAgentLoopTimerId = null;
-            myAgentLoopActive = false;
-            myBtn.textContent = 'Start Watch Loop';
-            myStatusLabel.textContent = 'stopped';
-            myStatusLabel.style.color = 'var(--accent-orange)';
+            myAgentSetLoopStopped();
             myAgentLog('Watch loop stopped.');
         } else {
             if (!myAgentDirHandle) { alert('Select an agent folder first.'); return; }
@@ -3259,6 +3314,27 @@ exactly as shown for every file.`;
     let myAgentLastStats = null;
 
     const myAgentFmtBytes = (myN) => myN < 1024 ? `${myN} B` : `${(myN / 1024).toFixed(1)} KB`;
+    const myAgentByteSize = (myText) => new TextEncoder().encode(myText).length;
+
+    // Backend and model names shown in both agent panels and in the chat summaries
+    const myActiveBackendName = () => myBackendMode === 'webgpu' ? 'WebGPU' : 'Ollama';
+    const myActiveModelName = () => {
+        if (myBackendMode === 'webgpu') {
+            const mySel = document.getElementById('myWebgpuModelSelect');
+            if (mySel.value === '__custom__') return document.getElementById('myWebgpuCustomUrlInput').value.trim() || 'custom model';
+            const myOpt = mySel.options[mySel.selectedIndex];
+            return (myOpt ? myOpt.textContent : mySel.value).trim().slice(0, 60);
+        }
+        return document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL;
+    };
+    window.myUpdateAgentLabels = () => {
+        const myText = `${myActiveBackendName()} · ${myActiveModelName()}`;
+        ['myAgentModelLabel', 'myAgBackendLabel'].forEach((myId) => {
+            const myEl = document.getElementById(myId);
+            if (myEl) myEl.textContent = myText;
+        });
+    };
+    setInterval(window.myUpdateAgentLabels, 1000);
 
     // Posts a "folder agent" bubble into the main chat and returns an update function,
     // so one bubble can go from "working…" to the final summary. These bubbles are
@@ -3274,8 +3350,10 @@ exactly as shown for every file.`;
         myText.className = 'my-msg-text';
         myDiv.appendChild(myText);
         myChatBox.appendChild(myDiv);
-        return (myLines) => {
-            myText.innerHTML = myLines.map(myEscapeHtml).join('<br>');
+        return (myLines, myDetails) => {
+            let myHtml = myLines.map(myEscapeHtml).join('<br>');
+            if (myDetails) myHtml += '<details style="margin-top:6px;"><summary style="cursor:pointer;">Reply preview (first 300 characters)</summary><pre style="white-space:pre-wrap;margin:4px 0;">' + myEscapeHtml(myDetails) + '</pre></details>';
+            myText.innerHTML = myHtml;
             const myAuto = document.getElementById('myAutoScrollCheck');
             if (myAuto && myAuto.checked) myChatBox.scrollTop = myChatBox.scrollHeight;
         };
@@ -3286,40 +3364,46 @@ exactly as shown for every file.`;
     // same Model / Context Window / System Prompt fields as the main chat UI.
     const myAgentAskModel = async (myPromptText) => {
         myAgentLastStats = null;
-        if (myBackendMode === 'webgpu') {
-            return await myWebgpuAskOnce(myPromptText);
-        }
-        const myModelName = document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL;
-        const mySysPrompt = document.getElementById('mySysPromptInput').value.trim();
-        const myNumCtx = parseInt(document.getElementById('myCtxSelect').value, 10);
-        const myMessages = [];
-        if (mySysPrompt) myMessages.push({ role: 'system', content: mySysPrompt });
-        myMessages.push({ role: 'user', content: myPromptText });
+        myAgentAbort = new AbortController();
+        try {
+            if (myBackendMode === 'webgpu') {
+                return await myWebgpuAskOnce(myPromptText);
+            }
+            const myModelName = document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL;
+            const mySysPrompt = document.getElementById('mySysPromptInput').value.trim();
+            const myNumCtx = parseInt(document.getElementById('myCtxSelect').value, 10);
+            const myMessages = [];
+            if (mySysPrompt) myMessages.push({ role: 'system', content: mySysPrompt });
+            myMessages.push({ role: 'user', content: myPromptText });
 
-        const myResp = await fetch(`${MY_OLLAMA_BASE}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: myModelName,
-                messages: myMessages,
-                stream: false,
-                options: { num_ctx: myNumCtx }
-            })
-        });
+            const myResp = await fetch(`${MY_OLLAMA_BASE}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: myAgentAbort.signal,
+                body: JSON.stringify({
+                    model: myModelName,
+                    messages: myMessages,
+                    stream: false,
+                    options: { num_ctx: myNumCtx }
+                })
+            });
 
-        if (!myResp.ok) {
-            const myErrText = await myResp.text();
-            throw new Error(myErrText || `HTTP ${myResp.status}`);
+            if (!myResp.ok) {
+                const myErrText = await myResp.text();
+                throw new Error(myErrText || `HTTP ${myResp.status}`);
+            }
+            const myData = await myResp.json();
+            if (myData.eval_count) {
+                myAgentLastStats = {
+                    tokens: myData.eval_count,
+                    promptTokens: myData.prompt_eval_count || 0,
+                    genSec: myData.eval_duration ? myData.eval_duration / 1e9 : 0
+                };
+            }
+            return (myData.message && myData.message.content) ? myData.message.content.trim() : '';
+        } finally {
+            myAgentAbort = null;
         }
-        const myData = await myResp.json();
-        if (myData.eval_count) {
-            myAgentLastStats = {
-                tokens: myData.eval_count,
-                promptTokens: myData.prompt_eval_count || 0,
-                genSec: myData.eval_duration ? myData.eval_duration / 1e9 : 0
-            };
-        }
-        return (myData.message && myData.message.content) ? myData.message.content.trim() : '';
     };
 
     // Local models (including small Ollama models) very often wrap output in a ``` fence
@@ -3394,10 +3478,26 @@ exactly as shown for every file.`;
         await myWritable.close();
     };
 
+    // True if the (possibly nested) file already exists. Used to tell "created" from "updated".
+    const myAgentFileExists = async (myRootHandle, myPath) => {
+        try {
+            const mySegments = myPath.split('/').filter((s) => s.length > 0);
+            let myDirHandle = myRootHandle;
+            for (let myI = 0; myI < mySegments.length - 1; myI++) {
+                myDirHandle = await myDirHandle.getDirectoryHandle(mySegments[myI]);
+            }
+            await myDirHandle.getFileHandle(mySegments[mySegments.length - 1]);
+            return true;
+        } catch (myErr) {
+            return false;
+        }
+    };
+
     window.myProcessAgentFolderOnce = async () => {
         if (!myAgentDirHandle) { myAgentLog('No folder linked yet.'); return; }
         if (myAgentProcessingInFlight) return;
         myAgentProcessingInFlight = true;
+        myAgentStopRequested = false;
         myAgentStartTimer();
 
         const myMaxGenerations = parseInt(document.getElementById('myMaxGenerationsInput').value, 10) || 5;
@@ -3407,18 +3507,24 @@ exactly as shown for every file.`;
         const myMode = document.querySelector('input[name="myInputModeRadio"]:checked').value;
         const myMultiFileEnabled = document.getElementById('myMultiFileOutputToggle').checked;
         let myProcessedAny = false;
-        const myPassTotals = { jobs: 0, failed: 0, tokens: 0, files: 0, sec: 0 };
+        const myPassTotals = { jobs: 0, failed: 0, stopped: 0, tokens: 0, created: 0, updated: 0, sec: 0, estimated: false };
 
         // One shared "process a single job" routine used by all three modes, so
         // chaining/max-iteration/error-handling logic isn't duplicated three times.
         const myRunOneJob = async (myJobKey, myGetContent, myWriteOutput, myWriteBackInput, myDefaultOutName) => {
+            if (myAgentStopRequested) return;
             const myIterSoFar = myAgentChainCounts[myJobKey] || 0;
             if (myIterSoFar >= myEffectiveMax) return;
             let myChatUpdate = null;
-            const myWrittenFiles = [];
+            const myCreatedFiles = [];
+            const myUpdatedFiles = [];
             const myNotes = [];
             let myBackupMade = '';
             let myWroteBack = false;
+            // Files that existed before this pass wrote them are "updated", the rest are "created"
+            const myRecordFile = (myPath, myText, myExisted) => {
+                (myExisted ? myUpdatedFiles : myCreatedFiles).push(`${myPath} (${myAgentFmtBytes(myAgentByteSize(myText))})`);
+            };
             try {
                 const myContent = await myGetContent();
                 if (!myContent || !myContent.trim()) return;
@@ -3447,21 +3553,27 @@ exactly as shown for every file.`;
                 const myPrompt = await myAgentBuildPrompt(myTemplate, myJobKey, myContent, myIterSoFar + 1);
                 myAgentLog(`Processing ${myJobKey} (pass ${myIterSoFar + 1}/${myEffectiveMax})...`);
 
-                const myModelLabel = myBackendMode === 'webgpu' ? 'the WebGPU engine' : (document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL);
                 myChatUpdate = myAgentChatOpen();
-                myChatUpdate([`⚙ Working on ${myJobKey} — pass ${myIterSoFar + 1}/${myEffectiveMax}`, `Asking ${myModelLabel} (read ${myAgentFmtBytes(myContent.length)} of input)…`]);
+                myChatUpdate([`⚙ Working on ${myJobKey} — pass ${myIterSoFar + 1}/${myEffectiveMax}`, `Asking ${myActiveModelName()} (${myActiveBackendName()}), read ${myAgentFmtBytes(myAgentByteSize(myContent))} of input…`]);
                 const myJobStart = performance.now();
 
-                const myResult = await myAgentAskModel(myPrompt);
+                let myResult;
+                try {
+                    myResult = await myAgentAskModel(myPrompt);
+                } catch (myAskErr) {
+                    throw myAgentStopRequested ? myAgentStopError() : myAskErr;
+                }
+                if (myAgentStopRequested) throw myAgentStopError();
                 const myJobSec = (performance.now() - myJobStart) / 1000;
 
                 const myParsedFiles = myMultiFileEnabled ? myAgentParseMultiFileOutput(myResult) : null;
                 if (myParsedFiles && myParsedFiles.length > 0) {
                     for (const myFileEntry of myParsedFiles) {
                         try {
+                            const myExisted = await myAgentFileExists(myAgentDirHandle, myFileEntry.path);
                             await myAgentWriteNestedFile(myAgentDirHandle, myFileEntry.path, myFileEntry.content);
                             myAgentLog(`  wrote ${myFileEntry.path}`);
-                            myWrittenFiles.push(`${myFileEntry.path} (${myAgentFmtBytes(myFileEntry.content.length)})`);
+                            myRecordFile(myFileEntry.path, myFileEntry.content, myExisted);
                         } catch (myWriteErr) {
                             myAgentLog(`  skipped "${myFileEntry.path}": ${myWriteErr.message}`);
                             myNotes.push(`skipped ${myFileEntry.path}: ${myWriteErr.message}`);
@@ -3474,21 +3586,26 @@ exactly as shown for every file.`;
                     const myGuess = myMultiFileEnabled ? myAgentGuessSingleFileName(myResult) : null;
                     if (myGuess) {
                         try {
+                            const myExisted = await myAgentFileExists(myAgentDirHandle, myGuess.path);
                             await myAgentWriteNestedFile(myAgentDirHandle, myGuess.path, myGuess.content);
                             myAgentLog(`  no "=== FILE: name ===" marker found, but the model named itself "${myGuess.path}" — wrote that instead of the default output name.`);
                             await myAgentAppendManifest(myJobKey, [myGuess.path]);
-                            myWrittenFiles.push(`${myGuess.path} (${myAgentFmtBytes(myGuess.content.length)})`);
+                            myRecordFile(myGuess.path, myGuess.content, myExisted);
                             myNotes.push('no FILE marker found, so the file name was guessed from the reply');
                         } catch (myWriteErr) {
                             myAgentLog(`  guessed name "${myGuess.path}" failed (${myWriteErr.message}) — writing to the default output name instead.`);
-                            await myWriteOutput(myStripOuterMarkdownFence(myResult));
-                            myWrittenFiles.push(`${myDefaultOutName} (${myAgentFmtBytes(myResult.length)})`);
+                            const myOut = myStripOuterMarkdownFence(myResult);
+                            const myExisted = await myAgentFileExists(myAgentDirHandle, myDefaultOutName);
+                            await myWriteOutput(myOut);
+                            myRecordFile(myDefaultOutName, myOut, myExisted);
                             myNotes.push(`guessed name "${myGuess.path}" failed, used the default output name`);
                         }
                     } else {
                         if (myMultiFileEnabled) myAgentLog('  no "=== FILE: name ===" markers found — writing as a single file instead.');
-                        await myWriteOutput(myStripOuterMarkdownFence(myResult));
-                        myWrittenFiles.push(`${myDefaultOutName} (${myAgentFmtBytes(myResult.length)})`);
+                        const myOut = myStripOuterMarkdownFence(myResult);
+                        const myExisted = await myAgentFileExists(myAgentDirHandle, myDefaultOutName);
+                        await myWriteOutput(myOut);
+                        myRecordFile(myDefaultOutName, myOut, myExisted);
                     }
                 }
 
@@ -3510,35 +3627,53 @@ exactly as shown for every file.`;
                 myAgentLog(`Finished ${myJobKey}.`);
                 myProcessedAny = true;
 
-                // ── Chat feedback ──
+                // ── Chat summary (display only, never added to the conversation history) ──
+                const myPassNum = myIterSoFar + 1;
+                const myTotalSec = (performance.now() - myJobStart) / 1000;
                 const myExact = !!myAgentLastStats;
                 const myTokens = myExact ? myAgentLastStats.tokens : Math.ceil(myResult.length / 4);
+                const myPromptExact = myExact && myAgentLastStats.promptTokens > 0;
+                const myPromptTokens = myPromptExact ? myAgentLastStats.promptTokens : Math.ceil(myPrompt.length / 4);
                 const myGenSec = (myExact && myAgentLastStats.genSec > 0) ? myAgentLastStats.genSec : myJobSec;
                 const myTps = myGenSec > 0 ? (myTokens / myGenSec).toFixed(1) : '0';
                 const myTilde = myExact ? '' : '~';
-                const myPromptPart = (myExact && myAgentLastStats.promptTokens) ? ` (prompt ${myAgentLastStats.promptTokens})` : '';
-                const myPreview = myResult.replace(/\s+/g, ' ').trim().slice(0, 100);
+                const myPromptTilde = myPromptExact ? '' : '~';
+                let myChain;
+                if (myEffectiveMax === 1) myChain = 'single pass';
+                else if (myPassNum >= myEffectiveMax) myChain = 'chain complete (max reached)';
+                else myChain = `pass ${myPassNum + 1} of ${myEffectiveMax} queued`;
+
                 const myLines = [
-                    `✅ ${myJobKey} — pass ${myIterSoFar + 1}/${myEffectiveMax} finished in ${myJobSec.toFixed(1)}s`,
-                    `🔢 ${myTilde}${myTokens} tokens generated${myPromptPart} · ${myTilde}${myTps} tok/s`
+                    `${myNotes.length ? '⚠️' : '✅'} ${myJobKey} — pass ${myPassNum}/${myEffectiveMax} — ${myTotalSec.toFixed(1)}s`,
+                    `🤖 ${myActiveModelName()} (${myActiveBackendName()}) · 🔢 ${myTilde}${myTokens} tokens out, ${myPromptTilde}${myPromptTokens} prompt · ${myTilde}${myTps} tok/s`
                 ];
-                if (myWrittenFiles.length === 1) myLines.push(`📄 File written: ${myWrittenFiles[0]}`);
-                else if (myWrittenFiles.length > 1) myLines.push(`📄 ${myWrittenFiles.length} files written: ${myWrittenFiles.join(', ')}`);
+                if (myCreatedFiles.length) myLines.push(`🆕 Created: ${myCreatedFiles.join(', ')}`);
+                if (myUpdatedFiles.length) myLines.push(`✏️ Updated: ${myUpdatedFiles.join(', ')}`);
+                myLines.push(`📏 Input ${myAgentFmtBytes(myAgentByteSize(myContent))} → output ${myAgentFmtBytes(myAgentByteSize(myResult))}`);
                 if (myBackupMade) myLines.push(`💾 Original input backed up as ${myBackupMade}`);
-                if (myWroteBack) myLines.push(`↻ Input file updated with this result, ready for pass ${myIterSoFar + 2}`);
-                if (myMultiFileEnabled && myWrittenFiles.length > 0) myLines.push('📋 Manifest updated');
+                if (myWroteBack) myLines.push(`↻ Input file updated with this result, ready for pass ${myPassNum + 1}`);
+                if (myMultiFileEnabled && (myCreatedFiles.length + myUpdatedFiles.length) > 0) myLines.push('📋 Manifest updated');
+                myLines.push(`🔗 Chain: ${myChain}`);
                 myNotes.forEach((myNote) => myLines.push(`⚠ ${myNote}`));
-                if (myPreview) myLines.push(`📝 Reply starts: ${myPreview}${myResult.length > 100 ? '…' : ''}`);
-                myChatUpdate(myLines);
+                const myReplyText = myResult.trim();
+                myChatUpdate(myLines, myReplyText.slice(0, 300) + (myReplyText.length > 300 ? '…' : ''));
 
                 myPassTotals.jobs++;
                 myPassTotals.tokens += myTokens;
-                myPassTotals.files += myWrittenFiles.length;
-                myPassTotals.sec += myJobSec;
+                myPassTotals.created += myCreatedFiles.length;
+                myPassTotals.updated += myUpdatedFiles.length;
+                myPassTotals.sec += myTotalSec;
+                if (!myExact) myPassTotals.estimated = true;
             } catch (myJobErr) {
-                myAgentLog(`Error on ${myJobKey}: ${myJobErr.message}`);
-                (myChatUpdate || myAgentChatOpen())([`❌ ${myJobKey} failed: ${myJobErr.message}`]);
-                myPassTotals.failed++;
+                if (myJobErr.name === 'AbortError') {
+                    myAgentLog(`Stopped by user while processing ${myJobKey}.`);
+                    (myChatUpdate || myAgentChatOpen())([`⏹ ${myJobKey} — pass ${myIterSoFar + 1}/${myEffectiveMax} stopped by user`, 'The model call was aborted and nothing was written for this pass.']);
+                    myPassTotals.stopped++;
+                } else {
+                    myAgentLog(`Error on ${myJobKey}: ${myJobErr.message}`);
+                    (myChatUpdate || myAgentChatOpen())([`❌ ${myJobKey} failed: ${myJobErr.message}`]);
+                    myPassTotals.failed++;
+                }
             }
         };
 
@@ -3623,10 +3758,12 @@ exactly as shown for every file.`;
         } finally {
             myAgentProcessingInFlight = false;
             myAgentStopTimer();
-            if (myPassTotals.jobs + myPassTotals.failed > 1) {
+            const myJobCount = myPassTotals.jobs + myPassTotals.failed + myPassTotals.stopped;
+            if (myJobCount > 1) {
+                const myTilde = myPassTotals.estimated ? '~' : '';
                 myAgentChatOpen()([
-                    `📊 Pass complete: ${myPassTotals.jobs} job(s) done${myPassTotals.failed ? `, ${myPassTotals.failed} failed` : ''}`,
-                    `🔢 ${myPassTotals.tokens} tokens · ⏱ ${myPassTotals.sec.toFixed(1)}s · 📄 ${myPassTotals.files} file(s) written`
+                    `📊 Pass totals: ${myPassTotals.jobs} job(s) done${myPassTotals.failed ? `, ${myPassTotals.failed} failed` : ''}${myPassTotals.stopped ? `, ${myPassTotals.stopped} stopped` : ''}`,
+                    `🔢 ${myTilde}${myPassTotals.tokens} tokens out · ⏱ ${myPassTotals.sec.toFixed(1)}s · 🆕 ${myPassTotals.created} created · ✏️ ${myPassTotals.updated} updated`
                 ]);
             }
             if (myProcessedAny) await window.myRefreshFileList();
@@ -3723,16 +3860,22 @@ exactly as shown for every file.`;
 </script>
 <script>
         let myAgBusy = false, myAgCancelled = false, myAgAbort = null;
-        let myVirtualFiles = {
+        let myCodeDirHandle = null;
+        let myAgProposals = [];
+        let myAgRun = null;
+        let myAgCallStats = null;
+        let myAgTimerId = null, myAgRunStart = 0;
+        const MY_CODE_HANDLE_KEY = "codeFolderHandle";
+        const myDemoFiles = {
             "src/main.ino": "// SAMPLE FILE\nconst int myLedPin = 2;\nconst int myRelayPin = 6;\nvoid setup() {\n  Serial.begin(115200);\n  pinMode(myLedPin, OUTPUT);\n  pinMode(myRelayPin, OUTPUT);\n}\nvoid loop() {\n  digitalWrite(myLedPin, HIGH);\n  delay(500);\n  digitalWrite(myLedPin, LOW);\n  delay(500);\n}\n",
             "web/index.html": "<!-- SAMPLE FILE -->\n<button onclick=\"mySend('led')\">LED</button>\n<script src=\"app.js\"><\/script>\n",
             "web/app.js": "// SAMPLE FILE\nfunction mySend(myText) { console.log(myText); }\n",
             "README.md": "# Sample ESP32 project\nPins: LED = GPIO2, RELAY = GPIO6\n"
         };
-        let myAgProposals = [];
         const myAgColors = { idle: "#555", connecting: "#b8860b", thinking: "#0056b3", tool_requested: "#7b1fa2", awaiting_approval: "#e65100", executing_tool: "#7b1fa2", streaming: "#0056b3", completed: "#2e7d32", cancelled: "#757575", error: "#c62828" };
 
-        const myAgSetState = (myS) => { document.getElementById("myAgRunBtn").disabled = (myS === "connecting" || myS === "thinking" || myS === "streaming" || myS === "executing_tool" || myS === "tool_requested"); const myE = document.getElementById("myAgState"); myE.textContent = myS; myE.style.background = myAgColors[myS] || "#555"; };
+        const myAgUpdateRunBtn = () => { document.getElementById("myAgRunBtn").disabled = myAgBusy || !myCodeDirHandle; };
+        const myAgSetState = (myS) => { const myE = document.getElementById("myAgState"); myE.textContent = myS; myE.style.background = myAgColors[myS] || "#555"; myAgUpdateRunBtn(); };
         const myAgStatus = (myText, myOk) => { const myE = document.getElementById("myAgProviderStatus"); myE.textContent = myText; myE.style.color = myOk ? "#4caf50" : "#f44336"; };
         const myAgLog = (myKind, myTitle, myBody, myOpen) => {
             const myD = document.createElement("details"); if (myOpen) myD.open = true;
@@ -3744,6 +3887,11 @@ exactly as shown for every file.`;
             return myP;
         };
         window.myAgClearLog = () => { document.getElementById("myAgLog").innerHTML = ""; };
+        const myAgOpenPanel = () => { document.getElementById("myAgPanelBody").classList.add("open"); document.getElementById("myAgPanelLabel").textContent = "▲ hide"; };
+        const myAgShowStep = () => { document.getElementById("myAgStepLabel").textContent = myAgRun ? myAgRun.step + "/" + myAgRun.max : "0/0"; };
+        const myAgShowTimer = () => { document.getElementById("myAgTimerLabel").textContent = ((performance.now() - myAgRunStart) / 1000).toFixed(1) + "s"; };
+        const myAgStartTimer = () => { myAgRunStart = performance.now(); clearInterval(myAgTimerId); myAgTimerId = setInterval(myAgShowTimer, 100); };
+        const myAgStopTimer = () => { clearInterval(myAgTimerId); myAgTimerId = null; myAgShowTimer(); };
 
         const myAgPresets = {
             custom: { label: "Custom task (type below)", task: "" },
@@ -3781,7 +3929,7 @@ exactly as shown for every file.`;
 
         const myStreamModelResponse = async (myMessages, myOnText) => {
             const myMax = parseInt(document.getElementById("myAgMaxTokens").value) || 1024;
-            let myFull = "";
+            let myFull = ""; myAgCallStats = null;
             if (myBackendMode === "webgpu") {
                 const myStream = await myWebgpuConversation.sendMessageStreaming(myMessages[myMessages.length - 1].content);
                 for await (const myChunk of myStream) {
@@ -3808,6 +3956,7 @@ exactly as shown for every file.`;
                         const myObj = JSON.parse(myLine);
                         if (myObj.error) throw new Error("Ollama: " + myObj.error);
                         if (myObj.message && myObj.message.content) { myFull += myObj.message.content; myOnText(myFull); }
+                        if (myObj.done) myAgCallStats = { out: myObj.eval_count || 0, inn: myObj.prompt_eval_count || 0, sec: myObj.eval_duration ? myObj.eval_duration / 1e9 : 0 };
                     }
                 }
             } finally { try { myReader.releaseLock(); } catch (e) {} }
@@ -3827,36 +3976,122 @@ exactly as shown for every file.`;
             if (!myParts.length || myParts.some(p => p === ".." || /[<>:"|?*]/.test(p))) throw new Error("unsafe path rejected: " + myPath);
             return myParts.join("/");
         };
-        const myAgIsFolder = () => document.getElementById("myAgWsMode").value === "folder";
-        const myAgGetDir = () => { const myD = myAgentDirHandle; if (!myD) throw new Error("No local folder linked. Use 'Select / Create Agent Folder' below first."); return myD; };
+        const myCodeStoreHandle = async (myHandle) => {
+            const myDb = await myAgentOpenDb();
+            return new Promise((myResolve, myReject) => {
+                const myTx = myDb.transaction(MY_AGENT_STORE, "readwrite");
+                myTx.objectStore(MY_AGENT_STORE).put(myHandle, MY_CODE_HANDLE_KEY);
+                myTx.oncomplete = () => myResolve();
+                myTx.onerror = () => myReject(myTx.error);
+            });
+        };
+        const myCodeLoadStoredHandle = async () => {
+            const myDb = await myAgentOpenDb();
+            return new Promise((myResolve, myReject) => {
+                const myReq = myDb.transaction(MY_AGENT_STORE, "readonly").objectStore(MY_AGENT_STORE).get(MY_CODE_HANDLE_KEY);
+                myReq.onsuccess = () => myResolve(myReq.result || null);
+                myReq.onerror = () => myReject(myReq.error);
+            });
+        };
+
+        const myAgUpdateFolderUI = () => {
+            document.getElementById("myAgFolderLabel").textContent = myCodeDirHandle ? myCodeDirHandle.name : "none selected";
+            document.getElementById("myAgFolderHint").style.display = myCodeDirHandle ? "none" : "block";
+            document.getElementById("myAgDemoBtn").disabled = !myCodeDirHandle;
+            myAgUpdateRunBtn();
+        };
+        const myAgConfirmFolder = async (myHandle) => {
+            try {
+                if (myAgentDirHandle && await myAgentDirHandle.isSameEntry(myHandle)) {
+                    return confirm("This is the same folder the folder agent uses. Its files (*.in.txt, *.out.txt, config.json) would mix with your code. Use it anyway?");
+                }
+            } catch (e) {}
+            return true;
+        };
+        const myAgUseFolder = async (myHandle, myStore) => {
+            myCodeDirHandle = myHandle;
+            if (myStore) { try { await myCodeStoreHandle(myHandle); } catch (e) { myAgLog("error", "could not remember folder", e.message, true); } }
+            myAgUpdateFolderUI();
+            await myAgRefreshFiles();
+            myAgLog("file", "coding folder linked", myHandle.name, false);
+            if (!document.getElementById("myAgFileList").options.length && confirm("This coding folder is empty. Create the demo files here? Existing files are never overwritten.")) await myCreateDemoFiles();
+        };
+        window.myPickCodeFolder = async () => {
+            if (!window.showDirectoryPicker) { alert("File System Access API not supported in this browser. Use a recent Chrome or Edge."); return; }
+            try {
+                const myHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+                if (!(await myAgConfirmFolder(myHandle))) return;
+                await myAgUseFolder(myHandle, true);
+            } catch (e) { if (e.name !== "AbortError") myAgLog("error", "folder pick failed", e.message, true); }
+        };
+        window.myRelinkCodeFolder = async () => {
+            try {
+                const myHandle = await myCodeLoadStoredHandle();
+                if (!myHandle) { alert('No previously linked coding folder found. Use "Select / Create Coding Folder" first.'); return; }
+                let myPerm = await myHandle.queryPermission({ mode: "readwrite" });
+                if (myPerm !== "granted") myPerm = await myHandle.requestPermission({ mode: "readwrite" });
+                if (myPerm !== "granted") { myAgLog("error", "relink", "Permission to reuse the last coding folder was not granted.", true); return; }
+                if (!(await myAgConfirmFolder(myHandle))) return;
+                await myAgUseFolder(myHandle, false);
+            } catch (e) { myAgLog("error", "relink failed", e.message, true); }
+        };
+
+        // Only creates files that do not exist yet. Never overwrites, never deletes.
+        window.myCreateDemoFiles = async () => {
+            if (!myCodeDirHandle) { myAgLog("error", "demo files", "Pick a coding folder to begin.", true); return; }
+            const myMade = [], mySkipped = [], myFailed = [];
+            for (const [myPath, myText] of Object.entries(myDemoFiles)) {
+                try {
+                    const myP = myAgNormPath(myPath); const myParts = myP.split("/"); let myH = myCodeDirHandle;
+                    for (let myI = 0; myI < myParts.length - 1; myI++) myH = await myH.getDirectoryHandle(myParts[myI], { create: true });
+                    const myName = myParts[myParts.length - 1];
+                    let myExists = true;
+                    try { await myH.getFileHandle(myName); } catch (e) { if (e.name !== "NotFoundError") throw e; myExists = false; }
+                    if (myExists) { mySkipped.push(myP); continue; }
+                    const myW = await (await myH.getFileHandle(myName, { create: true })).createWritable(); await myW.write(myText); await myW.close();
+                    myMade.push(myP);
+                } catch (e) { myFailed.push(myPath + ": " + e.message); }
+            }
+            myAgLog("file", "demo files", "created: " + (myMade.join(", ") || "none") + "\nskipped (already exist, left untouched): " + (mySkipped.join(", ") || "none") + (myFailed.length ? "\nfailed: " + myFailed.join("; ") : ""), true);
+            await myAgRefreshFiles();
+        };
+
+        const myAgGetDir = () => { if (!myCodeDirHandle) throw new Error("No coding folder linked. Use 'Select / Create Coding Folder' first."); return myCodeDirHandle; };
         const myAgWalk = async (myDir, myPrefix, myOut) => {
             for await (const [myName, myH] of myDir.entries()) {
-                if (myOut.length > 300 || myName.startsWith(".")) continue;
+                if (myOut.length > 300 || myName.startsWith(".") || myName.endsWith(".bak")) continue;
                 if (myH.kind === "directory") await myAgWalk(myH, myPrefix + myName + "/", myOut);
                 else myOut.push(myPrefix + myName);
             }
         };
-        const myAgListFiles = async () => { if (!myAgIsFolder()) return Object.keys(myVirtualFiles).sort(); const myO = []; await myAgWalk(myAgGetDir(), "", myO); return myO.sort(); };
+        const myAgListFiles = async () => { const myO = []; await myAgWalk(myAgGetDir(), "", myO); return myO.sort(); };
         const myAgReadFile = async (myPath) => {
             const myP = myAgNormPath(myPath);
-            if (!myAgIsFolder()) { if (!(myP in myVirtualFiles)) throw new Error("file not found: " + myP); return myVirtualFiles[myP]; }
             let myH = myAgGetDir(); const myParts = myP.split("/");
-            for (let i = 0; i < myParts.length - 1; i++) myH = await myH.getDirectoryHandle(myParts[i]);
+            for (let myI = 0; myI < myParts.length - 1; myI++) myH = await myH.getDirectoryHandle(myParts[myI]);
             return await (await (await myH.getFileHandle(myParts[myParts.length - 1])).getFile()).text();
         };
+        // Returns the backup path, or "" for a new file. If the .bak copy fails, nothing is overwritten.
         const myAgWriteFile = async (myPath, myText) => {
             const myP = myAgNormPath(myPath);
-            if (!myAgIsFolder()) { myVirtualFiles[myP] = myText; return; }
             let myH = myAgGetDir(); const myParts = myP.split("/");
-            for (let i = 0; i < myParts.length - 1; i++) myH = await myH.getDirectoryHandle(myParts[i], { create: true });
+            for (let myI = 0; myI < myParts.length - 1; myI++) myH = await myH.getDirectoryHandle(myParts[myI], { create: true });
             const myName = myParts[myParts.length - 1];
-            try { const myOld = await (await (await myH.getFileHandle(myName)).getFile()).text(); const myBk = await myH.getFileHandle(myName + ".bak", { create: true }); const myBw = await myBk.createWritable(); await myBw.write(myOld); await myBw.close(); } catch (e) {}
+            let myOld = null, myBackup = "";
+            try { myOld = await (await (await myH.getFileHandle(myName)).getFile()).text(); } catch (e) { if (e.name !== "NotFoundError") throw e; }
+            if (myOld !== null) {
+                const myBw = await (await myH.getFileHandle(myName + ".bak", { create: true })).createWritable();
+                await myBw.write(myOld); await myBw.close();
+                myBackup = myP + ".bak";
+            }
             const myW = await (await myH.getFileHandle(myName, { create: true })).createWritable(); await myW.write(myText); await myW.close();
             if ((await myAgReadFile(myP)) !== myText) throw new Error("write verification failed for " + myP);
+            return myBackup;
         };
 
         window.myAgRefreshFiles = async () => {
             const myL = document.getElementById("myAgFileList"); myL.innerHTML = "";
+            if (!myCodeDirHandle) return;
             try { (await myAgListFiles()).forEach(f => { const o = document.createElement("option"); o.textContent = f; o.value = f; myL.appendChild(o); }); } catch (e) { myAgLog("error", "list files", e.message, true); }
         };
         window.myAgOpenFile = async () => {
@@ -3869,25 +4104,73 @@ exactly as shown for every file.`;
         };
 
         const myAgPropose = async (myPath, myNew, myWhy) => {
-            const myP = myAgNormPath(myPath); let myOld = "";
-            try { myOld = await myAgReadFile(myP); } catch (e) {}
+            myAgGetDir();
+            const myP = myAgNormPath(myPath); let myOld = "", myExisted = false;
+            try { myOld = await myAgReadFile(myP); myExisted = true; } catch (e) {}
             if (typeof myNew !== "string") throw new Error("content must be a string");
             if (myNew.length > 100000) throw new Error("content too large");
-            myAgProposals.push({ path: myP, oldText: myOld, newText: myNew, why: myWhy || "" });
+            myAgProposals.push({ path: myP, oldText: myOld, newText: myNew, why: myWhy || "", existed: myExisted });
             myAgRenderProposals();
         };
-        const myAgDiff = (myA, myB) => {
-            const mySa = new Set(myA.split("\n")), mySb = new Set(myB.split("\n")); let myOut = "";
-            myA.split("\n").forEach(l => { if (!mySb.has(l)) myOut += "- " + l + "\n"; });
-            myB.split("\n").forEach(l => { if (!mySa.has(l)) myOut += "+ " + l + "\n"; });
-            return myOut || "(no line changes)";
+
+        // Real line diff (longest common subsequence). Returns [["=" | "-" | "+", line], ...]
+        const myAgDiff = (myOld, myNew) => {
+            const myA = myOld === "" ? [] : myOld.split("\n"), myB = myNew.split("\n");
+            let myStart = 0;
+            while (myStart < myA.length && myStart < myB.length && myA[myStart] === myB[myStart]) myStart++;
+            let myEndA = myA.length, myEndB = myB.length;
+            while (myEndA > myStart && myEndB > myStart && myA[myEndA - 1] === myB[myEndB - 1]) { myEndA--; myEndB--; }
+            const myMidA = myA.slice(myStart, myEndA), myMidB = myB.slice(myStart, myEndB);
+            const myOut = myA.slice(0, myStart).map(l => ["=", l]);
+            const myN = myMidA.length, myM = myMidB.length;
+            if (myN * myM > 4000000) {
+                myMidA.forEach(l => myOut.push(["-", l])); myMidB.forEach(l => myOut.push(["+", l]));
+            } else {
+                const myT = [];
+                for (let myI = 0; myI <= myN; myI++) myT.push(new Uint32Array(myM + 1));
+                for (let myI = myN - 1; myI >= 0; myI--) for (let myJ = myM - 1; myJ >= 0; myJ--)
+                    myT[myI][myJ] = myMidA[myI] === myMidB[myJ] ? myT[myI + 1][myJ + 1] + 1 : Math.max(myT[myI + 1][myJ], myT[myI][myJ + 1]);
+                let myI = 0, myJ = 0;
+                while (myI < myN && myJ < myM) {
+                    if (myMidA[myI] === myMidB[myJ]) { myOut.push(["=", myMidA[myI]]); myI++; myJ++; }
+                    else if (myT[myI + 1][myJ] >= myT[myI][myJ + 1]) { myOut.push(["-", myMidA[myI]]); myI++; }
+                    else { myOut.push(["+", myMidB[myJ]]); myJ++; }
+                }
+                while (myI < myN) { myOut.push(["-", myMidA[myI]]); myI++; }
+                while (myJ < myM) { myOut.push(["+", myMidB[myJ]]); myJ++; }
+            }
+            myA.slice(myEndA).forEach(l => myOut.push(["=", l]));
+            return myOut;
+        };
+        // Red = removed, green = added, grey = 2 lines of context around each change
+        const myAgDiffEl = (myOld, myNew) => {
+            const myPre = document.createElement("pre"); myPre.style.cssText = "max-height:200px;overflow:auto;background:#0d0d0d;padding:6px;margin:4px 0;";
+            const myD = myAgDiff(myOld, myNew);
+            const myShow = myD.map(() => false);
+            myD.forEach((myL, myI) => { if (myL[0] !== "=") for (let myK = Math.max(0, myI - 2); myK <= Math.min(myD.length - 1, myI + 2); myK++) myShow[myK] = true; });
+            if (!myShow.includes(true)) { myPre.textContent = "(no line changes)"; return myPre; }
+            const myStyles = { "-": "background:#4a1515;color:#ff8a80;", "+": "background:#14391c;color:#a5d6a7;", "=": "color:#888;" };
+            let myGap = false;
+            myD.forEach((myL, myI) => {
+                if (!myShow[myI]) { myGap = true; return; }
+                if (myGap) { const myDots = document.createElement("div"); myDots.style.cssText = "color:#666;"; myDots.textContent = "..."; myPre.appendChild(myDots); myGap = false; }
+                const myRow = document.createElement("div"); myRow.style.cssText = myStyles[myL[0]]; myRow.textContent = myL[0] + " " + myL[1]; myPre.appendChild(myRow);
+            });
+            return myPre;
         };
         const myAgRenderProposals = () => {
             const myBox = document.getElementById("myAgProposals"); myBox.innerHTML = "";
+            const myBadge = document.getElementById("myAgBadge");
+            myBadge.textContent = myAgProposals.length; myBadge.title = myAgProposals.length + " proposal(s) waiting"; myBadge.style.display = myAgProposals.length ? "inline-block" : "none";
+            if (myAgProposals.length > 1) {
+                const myBar = document.createElement("div"); myBar.style.cssText = "margin-top:8px;";
+                myBar.innerHTML = '<button class="my-btn my-btn-green my-btn-sm" onclick="myAgApplyAll()">Apply All (' + myAgProposals.length + ')</button> <button class="my-btn my-btn-danger my-btn-sm" onclick="myAgRejectAll()">Reject All</button>';
+                myBox.appendChild(myBar);
+            }
             myAgProposals.forEach((myPr, myI) => {
                 const myD = document.createElement("div"); myD.style.cssText = "border:1px solid #e65100;margin-top:8px;padding:6px;";
-                const myT = document.createElement("div"); myT.textContent = "Proposed change to " + myPr.path + (myPr.oldText ? "" : " (new file)") + (myAgIsFolder() ? " [REAL FILE, .bak copy kept]" : " [virtual]") + (myPr.why ? " : " + myPr.why : "");
-                const myPre = document.createElement("pre"); myPre.style.cssText = "max-height:200px;overflow:auto;background:#0d0d0d;padding:6px;margin:4px 0;"; myPre.textContent = myAgDiff(myPr.oldText, myPr.newText);
+                const myT = document.createElement("div"); myT.textContent = "Proposed change to " + myPr.path + (myPr.existed ? " [existing file, .bak copy kept]" : " (new file)") + (myPr.why ? " : " + myPr.why : "");
+                const myPre = myAgDiffEl(myPr.oldText, myPr.newText);
                 const myA = document.createElement("button"); myA.className = "my-btn"; myA.textContent = "Apply"; myA.setAttribute("onclick", "myAgApply(" + myI + ")");
                 const myR = document.createElement("button"); myR.className = "my-btn"; myR.textContent = "Reject"; myR.setAttribute("onclick", "myAgReject(" + myI + ")");
                 myD.append(myT, myPre, myA, myR); myBox.appendChild(myD);
@@ -3896,12 +4179,25 @@ exactly as shown for every file.`;
         };
         window.myAgApply = async (myI) => {
             const myPr = myAgProposals[myI]; if (!myPr) return;
-            try { await myAgWriteFile(myPr.path, myPr.newText); myAgLog("file", "applied " + myPr.path, "Write completed and verified.", false); myAgProposals.splice(myI, 1); myAgRenderProposals(); myAgRefreshFiles(); if (!myAgProposals.length) myAgSetState("idle"); }
-            catch (e) { myAgLog("error", "apply failed", e.message, true); }
+            try {
+                const myBak = await myAgWriteFile(myPr.path, myPr.newText);
+                myAgLog("file", "applied " + myPr.path, "Write completed and verified." + (myBak ? " Backup: " + myBak : ""), false);
+                myAgProposals.splice(myI, 1); myAgRenderProposals(); myAgRefreshFiles();
+                myAgNote("applied " + myPr.path + (myBak ? " (backup " + myBak + ")" : " (new file)"));
+                if (!myAgProposals.length) myAgSetState("idle");
+            } catch (e) { myAgLog("error", "apply failed", e.message, true); myAgNote("could not apply " + myPr.path + ": " + e.message); }
         };
         window.myAgApplyAll = async () => { while (myAgProposals.length) { const n = myAgProposals.length; await window.myAgApply(0); if (myAgProposals.length === n) break; } };
-        window.myAgRejectAll = () => { myAgProposals.length = 0; myAgRenderProposals(); myAgSetState("idle"); };
-        window.myAgReject = (myI) => { myAgLog("file", "rejected " + myAgProposals[myI].path, "No change made.", false); myAgProposals.splice(myI, 1); myAgRenderProposals(); if (!myAgProposals.length) myAgSetState("idle"); };
+        window.myAgRejectAll = () => {
+            if (myAgRun) myAgProposals.forEach(p => myAgRun.actions.push("rejected " + p.path));
+            myAgProposals.length = 0; myAgRenderProposals(); myAgSetState("idle"); myAgChatRender();
+        };
+        window.myAgReject = (myI) => {
+            const myPr = myAgProposals[myI]; if (!myPr) return;
+            myAgLog("file", "rejected " + myPr.path, "No change made.", false);
+            myAgProposals.splice(myI, 1); myAgRenderProposals(); myAgNote("rejected " + myPr.path);
+            if (!myAgProposals.length) myAgSetState("idle");
+        };
 
         const myAgPinCheck = (myPins) => {
             let myB; try { myB = JSON.parse(document.getElementById("myAgBoard").value); } catch (e) { throw new Error("board profile is not valid JSON"); }
@@ -3960,7 +4256,7 @@ exactly as shown for every file.`;
             search_files: { args: { query: "string" }, run: async (a) => { const r = []; for (const f of await myAgListFiles()) { try { (await myAgReadFile(f)).split("\n").forEach((l, i) => { if (r.length < 30 && l.toLowerCase().includes(a.query.toLowerCase())) r.push(f + ":" + (i + 1) + ": " + l.slice(0, 120)); }); } catch (e) {} } return { matches: r }; } },
             propose_file_write: { args: { path: "string", content: "string" }, run: async (a) => { await myAgPropose(a.path, a.content, "agent proposal"); return { status: "proposed", note: "Waiting for user approval. Nothing is written yet." }; } },
             propose_file_edit: { args: { path: "string", old_text: "string", new_text: "string" }, run: async (a) => { const t = await myAgReadFile(a.path); const n = t.split(a.old_text).length - 1; if (n !== 1) throw new Error("old_text must match exactly once, found " + n); await myAgPropose(a.path, t.replace(a.old_text, () => a.new_text), "agent edit"); return { status: "proposed", note: "Waiting for user approval. Nothing is written yet." }; } },
-            get_workspace_summary: { args: {}, run: async () => { const fs = await myAgListFiles(); return { mode: myAgIsFolder() ? "local folder" : "virtual sample", fileCount: fs.length, files: fs.slice(0, 50), pendingProposals: myAgProposals.length }; } },
+            get_workspace_summary: { args: {}, run: async () => { const fs = await myAgListFiles(); return { folder: myAgGetDir().name, fileCount: fs.length, files: fs.slice(0, 50), pendingProposals: myAgProposals.length }; } },
             inspect_esp32_pin_map: { args: { pins: "object" }, run: async (a) => myAgPinCheck(a.pins) },
             get_serial_status: { args: {}, run: async () => ({ supported: "serial" in navigator, connected: !!myPort, note: "Agent can read status only; it cannot send serial data or flash." }) }
         };
@@ -3981,51 +4277,117 @@ exactly as shown for every file.`;
         };
         const myAgParse = (myText) => { let myS = myText.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim(); return JSON.parse(myS); };
 
+        // ── Chat bubble for each run (display only, never sent to the model) ──
+        const myAgNewRun = (myTask, myMax) => ({ task: myTask, max: myMax, step: 0, tool: "", outcome: "running", error: "", startMs: performance.now(), endMs: 0, backend: myActiveBackendName(), model: myActiveModelName(), tokensIn: 0, tokensOut: 0, genSec: 0, estimated: false, toolCounts: {}, filesRead: new Set(), proposals: 0, retries: 0, duplicates: 0, finalText: "", actions: [], textEl: null });
+        const myAgChatOpen = () => {
+            const myChatBox = document.getElementById("myChatBox"); const myEmpty = document.getElementById("myEmptyState"); if (myEmpty) myEmpty.remove();
+            const myDiv = document.createElement("div"); myDiv.className = "my-msg ai"; myDiv.innerHTML = '<div class="my-msg-label">coding agent</div>';
+            const myText = document.createElement("div"); myText.className = "my-msg-text"; myDiv.appendChild(myText); myChatBox.appendChild(myDiv);
+            myAgRun.textEl = myText;
+        };
+        const myAgChatRender = () => {
+            const myR = myAgRun; if (!myR || !myR.textEl) return;
+            const myE = myEscapeHtml;
+            const myTask = myR.task.replace(/\s+/g, " ").trim();
+            const myIcons = { running: "⚙", completed: "✅", cancelled: "⏹", "step limit": "⚠️", error: "❌" };
+            let myHtml = myIcons[myR.outcome] + " <b>Coding agent: " + myE(myTask.slice(0, 80)) + (myTask.length > 80 ? "…" : "") + "</b>";
+            if (myR.outcome === "running") {
+                myHtml += "<br>" + (myR.step ? "step " + myR.step + "/" + myR.max + " · " + (myR.tool ? "running " + myE(myR.tool) : "thinking…") : "starting…");
+            } else {
+                const myT = myR.estimated ? "~" : "";
+                const myTps = myR.genSec > 0 ? (myR.tokensOut / myR.genSec).toFixed(1) : "0";
+                const myTools = Object.entries(myR.toolCounts).map(([k, v]) => k + " x" + v);
+                myHtml += "<br>Outcome: " + myR.outcome + " · steps " + myR.step + "/" + myR.max + " · " + ((myR.endMs - myR.startMs) / 1000).toFixed(1) + "s";
+                myHtml += "<br>Tokens: " + myT + myR.tokensIn + " in / " + myT + myR.tokensOut + " out · " + myT + myTps + " tok/s · " + myE(myR.model) + " (" + myR.backend + ")";
+                myHtml += "<br>Tools used: " + (myTools.length ? myE(myTools.join(", ")) : "none");
+                myHtml += "<br>Files read: " + (myR.filesRead.size ? myE([...myR.filesRead].join(", ")) : "none");
+                myHtml += "<br>Proposals made: " + myR.proposals + " · invalid-response retries: " + myR.retries + " · duplicate requests: " + myR.duplicates;
+                if (myR.error) myHtml += "<br>Error: " + myE(myR.error);
+                if (myR.finalText) myHtml += '<div style="margin-top:6px;"><b>What was done</b> (the model\'s own summary, not verified):<pre style="white-space:pre-wrap;margin:4px 0;">' + myE(myR.finalText) + "</pre></div>";
+                const myPending = myAgProposals.length;
+                const myWord = myPending + (myPending === 1 ? " proposal is" : " proposals are");
+                if (myPending && !myR.actions.length) myHtml += "<br><b>Nothing has changed yet:</b> " + myWord + " waiting for your approval.";
+                else if (myPending) myHtml += "<br>" + myWord + " still waiting for your approval.";
+                if (myR.actions.length) myHtml += "<br>" + myR.actions.map(myE).join("<br>");
+                if (!myPending && myR.actions.length) myHtml += "<br><b>all proposals resolved</b>";
+                else if (!myPending && myR.outcome === "completed" && !myR.proposals) myHtml += "<br>No file changes were proposed.";
+                myHtml += "<br><i>Note: the output has not been compiled or tested.</i>";
+            }
+            myR.textEl.innerHTML = myHtml;
+            const myAuto = document.getElementById("myAutoScrollCheck"); const myBox = document.getElementById("myChatBox");
+            if (myAuto && myAuto.checked) myBox.scrollTop = myBox.scrollHeight;
+        };
+        const myAgNote = (myText) => { if (!myAgRun) return; myAgRun.actions.push(myText); myAgChatRender(); };
+        const myAgAddStats = (myMsgs, myText, myMs) => {
+            const myR = myAgRun;
+            if (myAgCallStats && myAgCallStats.out) { myR.tokensOut += myAgCallStats.out; myR.tokensIn += myAgCallStats.inn; myR.genSec += myAgCallStats.sec > 0 ? myAgCallStats.sec : myMs / 1000; }
+            else { myR.estimated = true; myR.tokensOut += Math.ceil(myText.length / 4); myR.tokensIn += Math.ceil(myMsgs.reduce((n, m) => n + m.content.length, 0) / 4); myR.genSec += myMs / 1000; }
+        };
+        const myAgFinishRun = (myOutcome, myError) => {
+            if (!myAgRun) return;
+            myAgRun.outcome = myOutcome; myAgRun.error = myError || ""; myAgRun.endMs = performance.now();
+            myAgStopTimer(); myAgChatRender();
+        };
+
         window.myRunAgentLoop = async () => {
+            if (!myCodeDirHandle) { myAgLog("error", "no coding folder", "Pick a coding folder to begin.", true); return; }
             if (myAgBusy) { myAgLog("error", "busy", "An agent run is already active.", true); return; }
-            myAgBusy = true; myAgCancelled = false; myAgSetState("connecting");
-            document.getElementById("myAgRunBtn").disabled = true;
-            let myOldPreface = null;
-            try { await myAgEnsureReady(); } catch (e) { myAgStatus(e.message, false); myAgLog("error", "provider not ready", e.message, true); myAgSetState("error"); myAgBusy = false; document.getElementById("myAgRunBtn").disabled = false; return; }
-            if (myBackendMode === "webgpu") { try { myOldPreface = myWebgpuConversation.preface.messages[0].content; myWebgpuConversation.preface.messages[0].content = myAgSystemPrompt(); } catch (e) {} }
+            myAgBusy = true; myAgCancelled = false; myAgSetState("connecting"); myAgOpenPanel();
             const myMax = Math.min(20, parseInt(document.getElementById("myAgMaxLoops").value) || 8);
-            const myMsgs = [{ role: "system", content: myAgSystemPrompt() }, { role: "user", content: document.getElementById("myAgTask").value }];
-            const myDone = new Set();
+            const myTask = document.getElementById("myAgTask").value;
+            myAgRun = myAgNewRun(myTask, myMax); myAgChatOpen(); myAgShowStep(); myAgStartTimer(); myAgChatRender();
+            let myOldPreface = null, myOutcome = "error", myErrText = "";
             try {
+                try { await myAgEnsureReady(); } catch (e) { myAgStatus(e.message, false); myAgLog("error", "provider not ready", e.message, true); myAgSetState("error"); myErrText = e.message; return; }
+                if (myBackendMode === "webgpu") { try { myOldPreface = myWebgpuConversation.preface.messages[0].content; myWebgpuConversation.preface.messages[0].content = myAgSystemPrompt(); } catch (e) {} }
+                const myMsgs = [{ role: "system", content: myAgSystemPrompt() }, { role: "user", content: myTask }];
+                const myDone = new Set();
                 let myFinished = false;
                 for (let myI = 1; myI <= myMax && !myFinished; myI++) {
                     if (myAgCancelled) break;
+                    myAgRun.step = myI; myAgRun.tool = ""; myAgShowStep(); myAgChatRender();
                     myAgSetState("thinking");
                     const myPre = myAgLog("model", "model output, step " + myI + " (commentary, not verified reasoning)", "", false);
-                    let myText;
+                    let myText; const myCallStart = performance.now();
                     try { myText = await myStreamModelResponse(myMsgs, (t) => { myAgSetState("streaming"); myPre.textContent = t; }); }
                     catch (e) { if (myAgCancelled || e.name === "AbortError") break; throw e; }
+                    myAgAddStats(myMsgs, myText, performance.now() - myCallStart);
                     if (myAgCancelled) break;
                     myMsgs.push({ role: "assistant", content: myText });
                     let myObj;
                     try { myObj = myAgParse(myText); myAgValidate(myObj); }
-                    catch (e) { myAgLog("error", "invalid model response", e.message, true); myMsgs.push({ role: "user", content: "TOOL_ERROR: " + e.message + ". Reply with one valid JSON object." }); continue; }
-                    if (myObj.type === "final") { myAgLog("final", "final answer", myObj.content, true); myFinished = true; myAgSetState("completed"); break; }
+                    catch (e) { myAgRun.retries++; myAgLog("error", "invalid model response", e.message, true); myMsgs.push({ role: "user", content: "TOOL_ERROR: " + e.message + ". Reply with one valid JSON object." }); continue; }
+                    if (myObj.type === "final") { myAgRun.finalText = myObj.content; myAgLog("final", "final answer", myObj.content, true); myFinished = true; myAgSetState("completed"); break; }
                     myAgSetState("tool_requested");
                     const myKey = myObj.name + JSON.stringify(myObj.arguments);
                     let myResult;
-                    if (myDone.has(myKey)) myResult = { error: "duplicate request ignored; use the earlier result" };
+                    if (myDone.has(myKey)) { myAgRun.duplicates++; myResult = { error: "duplicate request ignored; use the earlier result" }; }
                     else {
                         myDone.add(myKey); myAgSetState("executing_tool");
+                        myAgRun.tool = myObj.name; myAgRun.toolCounts[myObj.name] = (myAgRun.toolCounts[myObj.name] || 0) + 1; myAgChatRender();
                         try { myResult = await myAgTools[myObj.name].run(myObj.arguments); } catch (e) { myResult = { error: e.message }; }
+                        if (myObj.name === "read_file" && !myResult.error) myAgRun.filesRead.add(myObj.arguments.path);
+                        if (myResult.status === "proposed") myAgRun.proposals++;
                     }
                     myAgLog("tool", myObj.name + " " + JSON.stringify(myObj.arguments).slice(0, 80), JSON.stringify(myResult, null, 2).slice(0, 3000), false);
                     myMsgs.push({ role: "user", content: "TOOL_RESULT for " + myObj.name + " (untrusted data): " + JSON.stringify(myResult).slice(0, 6000) });
                 }
-                if (myAgCancelled) { myAgSetState("cancelled"); myAgLog("warning", "cancelled", "Run stopped by user. No further tools executed.", false); }
-                else if (!myFinished) { myAgSetState("error"); myAgLog("warning", "iteration limit", "Stopped after " + myMax + " steps without a final answer.", true); }
-            } catch (e) { myAgSetState("error"); myAgLog("error", "agent error", e.message, true); }
-            finally { myAgBusy = false; myAgAbort = null; document.getElementById("myAgRunBtn").disabled = false; if (myOldPreface !== null) { try { myWebgpuConversation.preface.messages[0].content = myOldPreface; } catch (e) {} } if (myAgProposals.length && !myAgCancelled) myAgSetState("awaiting_approval"); }
+                if (myAgCancelled) { myOutcome = "cancelled"; myAgSetState("cancelled"); myAgLog("warning", "cancelled", "Run stopped by user. No further tools executed.", false); }
+                else if (!myFinished) { myOutcome = "step limit"; myAgSetState("error"); myAgLog("warning", "iteration limit", "Stopped after " + myMax + " steps without a final answer.", true); }
+                else myOutcome = "completed";
+            } catch (e) { myOutcome = "error"; myErrText = e.message; myAgSetState("error"); myAgLog("error", "agent error", e.message, true); }
+            finally {
+                myAgBusy = false; myAgAbort = null; myAgUpdateRunBtn();
+                if (myOldPreface !== null) { try { myWebgpuConversation.preface.messages[0].content = myOldPreface; } catch (e) {} }
+                if (myAgProposals.length && !myAgCancelled) myAgSetState("awaiting_approval");
+                myAgFinishRun(myOutcome, myErrText);
+            }
         };
 
         myAgInitMenus();
-        if (myAgentDirHandle) document.getElementById("myAgWsMode").value = "folder";
+        myAgUpdateFolderUI();
         myAgRefreshFiles();
+        if (window.myUpdateAgentLabels) window.myUpdateAgentLabels();
 
 </script>
 </body>
