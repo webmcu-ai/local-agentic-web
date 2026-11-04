@@ -24,43 +24,36 @@ add to the index.html near the top
 
 
 
-
+near the top
 
 ```
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>local-agentic-web</title>
 
   <!-- PWA Manifest & Control Script -->
   <link rel="manifest" href="pwa/manifest.json">
   <script src="pwa/pwa.js" defer></script>
-</head>
-<body>
 
-  <header>
-    <h1>local-agentic-web</h1>
-    
-    <!-- Connection Status Badge (Inline CSS) -->
-    <span id="myConnectionBadge" style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background-color: #22B14C; color: #ffffff; margin-right: 10px;">Online</span>
 
-    <!-- PWA Action Buttons -->
-    <button id="myPwaInstallButton" style="display: none;" onclick="myHandleInstallButtonClick()">
-      Install App
-    </button>
-    <button id="myPwaUpdateButton" style="display: none;" onclick="myHandleUpdateButtonClick()">
-      New Version Available (Click to Update)
-    </button>
-  </header>
+```
 
-  <main>
-    <p>local-agentic-web interface workspace.</p>
-  </main>
 
-</body>
-</html>
+
+with the custom header
+
+```
+<!-- Existing Engine Chip -->
+        <span id="myEngineChip" style="display:none; font-family:var(--font-mono); font-size:0.7rem; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--text-muted); white-space:nowrap;" title="Which local engine loaded the current WebGPU model"></span>
+
+        <!-- NEW: PWA Connection Badge & Action Buttons -->
+        <span id="myConnectionBadge" style="padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: bold; background-color: #22B14C; color: #ffffff; white-space:nowrap;">Online</span>
+        
+        <button id="myPwaInstallButton" style="display:none; padding: 4px 8px; font-size: 11px; cursor: pointer;" onclick="myHandleInstallButtonClick()">
+          Install App
+        </button>
+        
+        <button id="myPwaUpdateButton" style="display:none; padding: 4px 8px; font-size: 11px; cursor: pointer;" onclick="myHandleUpdateButtonClick()">
+          Update Available
+        </button>
+
 
 ```
