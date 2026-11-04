@@ -2408,6 +2408,31 @@ else if (f.type === 'video') {
 
 
 
+// ── Shared count-up clock (next to Auto-Scroll) used by chat, folder agent and coding agent ──
+    let myToolbarClockStart = 0, myToolbarClockId = null, myToolbarClockHideId = null;
+    const myToolbarClockBegin = (myLabel) => {
+        const myEl = document.getElementById('myTimerDisplay');
+        if (!myEl) return;
+        clearInterval(myToolbarClockId);
+        clearTimeout(myToolbarClockHideId);
+        myToolbarClockStart = performance.now();
+        const myShow = () => {
+            myEl.textContent = `${myLabel}… (${Math.floor((performance.now() - myToolbarClockStart) / 1000)}s)`;
+        };
+        myShow();
+        myEl.style.display = 'inline';
+        myToolbarClockId = setInterval(myShow, 1000);
+    };
+    const myToolbarClockEnd = (myWord) => {
+        const myEl = document.getElementById('myTimerDisplay');
+        if (!myEl) return;
+        clearInterval(myToolbarClockId);
+        myToolbarClockId = null;
+        myEl.textContent = `${myWord} in ${Math.floor((performance.now() - myToolbarClockStart) / 1000)}s`;
+        clearTimeout(myToolbarClockHideId);
+        myToolbarClockHideId = setTimeout(() => { myEl.style.display = 'none'; }, 4000);
+    };
+
 // ── Chat ──────────────────────────────────────────────────────────
     window.mySendMessage = async () => {
         const myInputEl = document.getElementById('myUserInput');
@@ -2508,16 +2533,8 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
         myChatBox.appendChild(myThinkDiv);
         if (myAutoScroll && myAutoScroll.checked) myChatBox.scrollTop = myChatBox.scrollHeight;
 
-        // Setup background live timing references outside try block scope
-        let mySecondsElapsed = 0;
-        const myToolbarTimer = document.getElementById('myTimerDisplay');
-        myToolbarTimer.textContent = 'thinking… (0s)';
-        myToolbarTimer.style.display = 'inline';
-
-        const myThinkInterval = setInterval(() => {
-            mySecondsElapsed++;
-            myToolbarTimer.textContent = `thinking… (${mySecondsElapsed}s)`;
-        }, 1000);
+        // Live count-up clock in the toolbar next to Auto-Scroll
+        myToolbarClockBegin('thinking');
 
         // Build message array for API
         const myMessages = [];
@@ -2651,10 +2668,8 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
                 myConversationHistory.pop();
             }
         } finally {
-            // Unset running timer tracking intervals safely inside clear handler
-            clearInterval(myThinkInterval);
             const myTotalSec = (performance.now() - myStartTime) / 1000;
-            myToolbarTimer.textContent = `completed in ${mySecondsElapsed}s`;
+            myToolbarClockEnd('completed');
 
             if (myFullResponse && !myFailed) {
                 // Prefer Ollama's exact numbers; otherwise count streamed chunks (approx. tokens)
@@ -2670,8 +2685,6 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
                 myStatsNote.textContent = `⏱ ${myTotalSec.toFixed(1)}s total · ${myApprox}${myTokens} tokens · ${myApprox}${myTps} tok/s`;
                 myThinkDiv.appendChild(myStatsNote);
             }
-            // Fade out timer after 4 seconds
-            setTimeout(() => { myToolbarTimer.style.display = 'none'; }, 4000);
 
             if (myFullResponse) {
                 myConversationHistory.push({ role: 'assistant', content: myFullResponse });
@@ -3507,6 +3520,7 @@ exactly as shown for every file.`;
         const myMode = document.querySelector('input[name="myInputModeRadio"]:checked').value;
         const myMultiFileEnabled = document.getElementById('myMultiFileOutputToggle').checked;
         let myProcessedAny = false;
+        let myClockOn = false;
         const myPassTotals = { jobs: 0, failed: 0, stopped: 0, tokens: 0, created: 0, updated: 0, sec: 0, estimated: false };
 
         // One shared "process a single job" routine used by all three modes, so
@@ -3553,6 +3567,7 @@ exactly as shown for every file.`;
                 const myPrompt = await myAgentBuildPrompt(myTemplate, myJobKey, myContent, myIterSoFar + 1);
                 myAgentLog(`Processing ${myJobKey} (pass ${myIterSoFar + 1}/${myEffectiveMax})...`);
 
+                if (!myClockOn) { myClockOn = true; myToolbarClockBegin('working'); }
                 myChatUpdate = myAgentChatOpen();
                 myChatUpdate([`⚙ Working on ${myJobKey} — pass ${myIterSoFar + 1}/${myEffectiveMax}`, `Asking ${myActiveModelName()} (${myActiveBackendName()}), read ${myAgentFmtBytes(myAgentByteSize(myContent))} of input…`]);
                 const myJobStart = performance.now();
@@ -3758,6 +3773,7 @@ exactly as shown for every file.`;
         } finally {
             myAgentProcessingInFlight = false;
             myAgentStopTimer();
+            if (myClockOn) myToolbarClockEnd(myPassTotals.failed ? 'finished with errors' : (myAgentStopRequested || myPassTotals.stopped) ? 'stopped' : 'completed');
             const myJobCount = myPassTotals.jobs + myPassTotals.failed + myPassTotals.stopped;
             if (myJobCount > 1) {
                 const myTilde = myPassTotals.estimated ? '~' : '';
@@ -3890,7 +3906,7 @@ exactly as shown for every file.`;
         const myAgOpenPanel = () => { document.getElementById("myAgPanelBody").classList.add("open"); document.getElementById("myAgPanelLabel").textContent = "▲ hide"; };
         const myAgShowStep = () => { document.getElementById("myAgStepLabel").textContent = myAgRun ? myAgRun.step + "/" + myAgRun.max : "0/0"; };
         const myAgShowTimer = () => { document.getElementById("myAgTimerLabel").textContent = ((performance.now() - myAgRunStart) / 1000).toFixed(1) + "s"; };
-        const myAgStartTimer = () => { myAgRunStart = performance.now(); clearInterval(myAgTimerId); myAgTimerId = setInterval(myAgShowTimer, 100); };
+        const myAgStartTimer = () => { myAgRunStart = performance.now(); clearInterval(myAgTimerId); myAgTimerId = setInterval(myAgShowTimer, 100); myToolbarClockBegin('working'); };
         const myAgStopTimer = () => { clearInterval(myAgTimerId); myAgTimerId = null; myAgShowTimer(); };
 
         const myAgPresets = {
@@ -4297,8 +4313,8 @@ exactly as shown for every file.`;
                 const myT = myR.estimated ? "~" : "";
                 const myTps = myR.genSec > 0 ? (myR.tokensOut / myR.genSec).toFixed(1) : "0";
                 const myTools = Object.entries(myR.toolCounts).map(([k, v]) => k + " x" + v);
-                myHtml += "<br>Outcome: " + myR.outcome + " · steps " + myR.step + "/" + myR.max + " · " + ((myR.endMs - myR.startMs) / 1000).toFixed(1) + "s";
-                myHtml += "<br>Tokens: " + myT + myR.tokensIn + " in / " + myT + myR.tokensOut + " out · " + myT + myTps + " tok/s · " + myE(myR.model) + " (" + myR.backend + ")";
+                myHtml += "<br>Outcome: " + myR.outcome + " · steps " + myR.step + "/" + myR.max;
+                myHtml += "<br>⏱ " + ((myR.endMs - myR.startMs) / 1000).toFixed(1) + "s total · " + myT + myR.tokensOut + " tokens out, " + myT + myR.tokensIn + " in · " + myT + myTps + " tok/s · " + myE(myR.model) + " (" + myR.backend + ")";
                 myHtml += "<br>Tools used: " + (myTools.length ? myE(myTools.join(", ")) : "none");
                 myHtml += "<br>Files read: " + (myR.filesRead.size ? myE([...myR.filesRead].join(", ")) : "none");
                 myHtml += "<br>Proposals made: " + myR.proposals + " · invalid-response retries: " + myR.retries + " · duplicate requests: " + myR.duplicates;
@@ -4327,6 +4343,7 @@ exactly as shown for every file.`;
             if (!myAgRun) return;
             myAgRun.outcome = myOutcome; myAgRun.error = myError || ""; myAgRun.endMs = performance.now();
             myAgStopTimer(); myAgChatRender();
+            myToolbarClockEnd({ completed: 'completed', cancelled: 'stopped', 'step limit': 'stopped at step limit', error: 'failed' }[myOutcome] || 'finished');
         };
 
         window.myRunAgentLoop = async () => {
