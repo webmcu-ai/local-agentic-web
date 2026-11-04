@@ -1151,7 +1151,7 @@ console.log("hi");</pre>
         <div id="myAgFolderHint" style="font-size:0.78rem;color:var(--accent-orange);font-family:var(--font-mono);">Pick a coding folder to begin</div>
         <div>
             <select id="myAgPreset" onchange="myAgPickPreset()" aria-label="Agent preset" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"></select>
-            <select id="myAgModelPick" onchange="myAgPickModel()" aria-label="Suggested Ollama models" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"><option value="">Suggested Ollama models (pull first)</option></select>
+            <select id="myAgModelPick" onchange="myAgPickModel()" aria-label="Suggested Ollama models" onfocus="myAgRefreshModels()" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"><option value="">Suggested Ollama models (pull first)</option></select>
             ctx <select id="myAgCtx" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"><option>4096</option><option selected>8192</option><option>16384</option></select>
             loops <input id="myAgMaxLoops" type="number" value="8" min="1" max="20" style="width:48px;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
             tokens <input id="myAgMaxTokens" type="number" value="1024" min="64" max="8192" style="width:70px;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
@@ -3922,7 +3922,17 @@ exactly as shown for every file.`;
         window.myAgInitMenus = () => {
             const myP = document.getElementById("myAgPreset"); const myM = document.getElementById("myAgModelPick");
             Object.entries(myAgPresets).forEach(([k, v]) => { const o = document.createElement("option"); o.value = k; o.textContent = v.label; myP.appendChild(o); });
-            myAgModels.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; myM.appendChild(o); });
+            myAgRefreshModels();
+        };
+        // Lists the models Ollama really has installed (suggested ones that are missing are marked)
+        const myAgRefreshModels = async () => {
+            const myM = document.getElementById("myAgModelPick"); let myInstalled = [];
+            try { const myR = await fetch(MY_OLLAMA_BASE + "/api/tags", { signal: AbortSignal.timeout(3000) }); if (myR.ok) myInstalled = ((await myR.json()).models || []).map(m => m.name); } catch (e) {}
+            while (myM.options.length > 1) myM.remove(1);
+            const myAdd = (v, t) => { const o = document.createElement("option"); o.value = v; o.textContent = t; myM.appendChild(o); };
+            myInstalled.forEach(n => myAdd(n, n));
+            myAgModels.filter(n => !myInstalled.includes(n)).forEach(n => myAdd(n, myInstalled.length ? n + " (not installed)" : n));
+            myM.value = document.getElementById("myModelInput").value.trim();
         };
         window.myAgPickPreset = () => { const myT = myAgPresets[document.getElementById("myAgPreset").value].task; if (myT) document.getElementById("myAgTask").value = myT; };
         window.myAgPickModel = () => { const myV = document.getElementById("myAgModelPick").value; if (!myV) return; document.getElementById("myModelInput").value = myV; if (window.mySaveConfig) window.mySaveConfig(); window.myCheckOllamaStatus(); };
@@ -3939,7 +3949,8 @@ exactly as shown for every file.`;
             catch (e) { throw new Error("Cannot reach Ollama at " + MY_OLLAMA_BASE + ". Is it running, and is OLLAMA_ORIGINS set for this page's address (see the Ollama setup steps above)?"); }
             if (!myR.ok) throw new Error("Ollama answered HTTP " + myR.status);
             const myNames = ((await myR.json()).models || []).map(m => m.name);
-            if (!myNames.includes(myModel)) throw new Error("Model '" + myModel + "' is not installed. Installed: " + (myNames.join(", ") || "none") + ". Run: ollama pull " + myModel);
+            const myNoLatest = (n) => n.replace(/:latest$/, "");
+            if (!myNames.map(myNoLatest).includes(myNoLatest(myModel))) throw new Error("Model '" + myModel + "' is not installed. Installed: " + (myNames.join(", ") || "none") + ". Run: ollama pull " + myModel);
             myAgStatus("Ollama ready: " + myModel, true);
         };
 
