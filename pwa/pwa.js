@@ -94,7 +94,7 @@ async function myHandleInstallButtonClick() {
   if (myInstallButton) {
     myInstallButton.style.display = "none";
   }
-});
+}
 
 // Reset if already installed
 window.addEventListener("appinstalled", () => {
