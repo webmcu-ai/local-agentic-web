@@ -555,7 +555,28 @@
             <div class="my-status-dot checking" id="myStatusDot"></div>
             <span id="myStatusText">checking...</span>
         </div>
+        
+
+
+<!-- Existing Engine Chip -->
         <span id="myEngineChip" style="display:none; font-family:var(--font-mono); font-size:0.7rem; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--text-muted); white-space:nowrap;" title="Which local engine loaded the current WebGPU model"></span>
+
+        <!-- NEW: PWA Connection Badge & Action Buttons -->
+        <span id="myConnectionBadge" style="padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: bold; background-color: #22B14C; color: #ffffff; white-space:nowrap;">Online</span>
+        
+        <button id="myPwaInstallButton" style="display:none; padding: 4px 8px; font-size: 11px; cursor: pointer;" onclick="myHandleInstallButtonClick()">
+          Install App
+        </button>
+        
+        <button id="myPwaUpdateButton" style="display:none; padding: 4px 8px; font-size: 11px; cursor: pointer;" onclick="myHandleUpdateButtonClick()">
+          Update Available
+        </button>
+
+
+
+
+
+        
     </div>
 </div>
 
