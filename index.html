@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v018</title>
+<title>Ollama Local AI + Agent — v019</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -1164,7 +1164,7 @@ console.log("hi");</pre>
     </div>
 </div>
 
-<!-- Coding Agent Panel (v018) -->
+<!-- Coding Agent Panel (v019) -->
 <div class="my-tools-panel">
     <div class="my-tools-header" onclick="window.myAgTogglePanel()">
         <div class="my-tools-header-left"><span>🤖</span><span>Coding Agent: tools, coding folder, ESP32 pins, Web Serial</span><span id="myAgBadge" title="proposals waiting" style="display:none;background:#e65100;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.7rem;margin-left:8px;">0</span></div>
@@ -2477,6 +2477,13 @@ const myFmtClock = (myMs) => {
     return String(Math.floor(mySec / 60)).padStart(2, '0') + ':' + String(mySec % 60).padStart(2, '0');
 };
 const myFmtDur = (myMs) => (myMs / 1000).toFixed(1) + 's';
+// v019: one rule for every stats line: tokens, seconds, and tok/s = tokens / those same (rounded) seconds
+const myFmtRate = (myTokens, mySec, myApprox) => {
+    const myShownSec = Math.round(mySec * 10) / 10;
+    const myRate = myShownSec > 0 ? (myTokens / myShownSec).toFixed(1) : '0.0';
+    const myTilde = myApprox ? '~' : '';
+    return `${myTilde}${myTokens} tokens · ${myShownSec.toFixed(1)}s · ${myTilde}${myRate} tok/s`;
+};
 const myBadgeColors = { INSPECTING: '#7b1fa2', AUDITING: '#7b1fa2', FOUND: '#7b1fa2', PLANNING: '#0056b3', GENERATING: '#0056b3', IMPLEMENTING: '#e65100', PROPOSED: '#e65100', REVIEWING: '#b8860b', TESTING: '#00838f', COMPLETE: '#2e7d32', FAILED: '#c62828', STOPPED: '#757575', INFO: '#555' };
 const myLabelColors = { 'VERIFIED': '#2e7d32', 'IMPLEMENTED — NOT VERIFIED': '#e65100', 'NOT IMPLEMENTED': '#c62828', 'NO CHANGE JUSTIFIED': '#0056b3' };
 
@@ -2850,7 +2857,7 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
         try {
             const myAiTextEl = document.createElement('div');
             myAiTextEl.className = 'my-msg-text';
-            myThinkDiv.innerHTML = `<div class="my-msg-label">${myEscapeHtml(myModelName)}</div>`;
+            myThinkDiv.innerHTML = `<div class="my-msg-label">${myEscapeHtml(myIsWebgpuBackend ? myModelName : myModelName + ' (Ollama)')}</div>`;
             myThinkDiv.appendChild(myAiTextEl);
 
             if (myIsWebgpuBackend) {
@@ -2973,15 +2980,12 @@ const { finalPrompt, images } = await myBuildOllamaPayload(
             if (myFullResponse && !myFailed) {
                 // Prefer Ollama's exact numbers; otherwise count streamed chunks (approx. tokens)
                 const myTokens = myOllamaStats ? myOllamaStats.count : myTokenCount;
-                const myGenSec = (myOllamaStats && myOllamaStats.durationNs) ? myOllamaStats.durationNs / 1e9 : myTotalSec;
-                const myTps = myGenSec > 0 ? (myTokens / myGenSec).toFixed(1) : '0';
-                const myApprox = myOllamaStats ? '' : '~';
                 const myStatsNote = document.createElement('div');
                 myStatsNote.style.color = 'var(--text-muted, #888)';
                 myStatsNote.style.fontSize = '0.72rem';
                 myStatsNote.style.fontFamily = 'var(--font-mono)';
                 myStatsNote.style.marginTop = '4px';
-                myStatsNote.textContent = `⏱ ${myTotalSec.toFixed(1)}s total · ${myApprox}${myTokens} tokens · ${myApprox}${myTps} tok/s`;
+                myStatsNote.textContent = '⏱ ' + myFmtRate(myTokens, myTotalSec, !myOllamaStats);
                 myThinkDiv.appendChild(myStatsNote);
             }
 
@@ -3946,7 +3950,7 @@ const myPipeAsk = async (myS, myPrompt) => {
     if (myAgentStopRequested) throw myAgentStopError();
     const mySec = (performance.now() - myStart) / 1000;
     myS.calls++;
-    if (myAgentLastStats) { myS.tokens += myAgentLastStats.tokens; myS.genSec += myAgentLastStats.genSec > 0 ? myAgentLastStats.genSec : mySec; }
+    if (myAgentLastStats) { myS.tokens += myAgentLastStats.tokens; myS.genSec += mySec; }
     else { myS.estimated = true; myS.tokens += Math.ceil(myResult.length / 4); myS.genSec += mySec; }
     return myResult;
 };
@@ -4424,8 +4428,6 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 const myTokens = myExact ? myAgentLastStats.tokens : Math.ceil(myResult.length / 4);
                 const myPromptExact = myExact && myAgentLastStats.promptTokens > 0;
                 const myPromptTokens = myPromptExact ? myAgentLastStats.promptTokens : Math.ceil(myPrompt.length / 4);
-                const myGenSec = (myExact && myAgentLastStats.genSec > 0) ? myAgentLastStats.genSec : myJobSec;
-                const myTps = myGenSec > 0 ? (myTokens / myGenSec).toFixed(1) : '0';
                 const myTilde = myExact ? '' : '~';
                 const myPromptTilde = myPromptExact ? '' : '~';
                 let myChain;
@@ -4435,7 +4437,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
 
                 const myLines = [
                     `${myNotes.length ? '⚠️' : '✅'} ${myJobKey} — pass ${myPassNum}/${myEffectiveMax} — ${myTotalSec.toFixed(1)}s`,
-                    `🤖 ${myActiveModelName()} (${myActiveBackendName()}) · 🔢 ${myTilde}${myTokens} tokens out, ${myPromptTilde}${myPromptTokens} prompt · ${myTilde}${myTps} tok/s`
+                    `🤖 ${myActiveModelName()} (${myActiveBackendName()}) · 🔢 ${myFmtRate(myTokens, myJobSec, !myExact)} (model call) · ${myPromptTilde}${myPromptTokens} prompt tokens`
                 ];
                 if (myCreatedFiles.length) myLines.push(`🆕 Created: ${myCreatedFiles.join(', ')}`);
                 if (myUpdatedFiles.length) myLines.push(`✏️ Updated: ${myUpdatedFiles.join(', ')}`);
@@ -4564,7 +4566,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 const myTilde = myPassTotals.estimated ? '~' : '';
                 myAgentChatOpen()([
                     `📊 Pass totals: ${myPassTotals.jobs} job(s) done${myPassTotals.failed ? `, ${myPassTotals.failed} failed` : ''}${myPassTotals.stopped ? `, ${myPassTotals.stopped} stopped` : ''}`,
-                    `🔢 ${myTilde}${myPassTotals.tokens} tokens out · ⏱ ${myPassTotals.sec.toFixed(1)}s · 🆕 ${myPassTotals.created} created · ✏️ ${myPassTotals.updated} updated`
+                    `🔢 ${myFmtRate(myPassTotals.tokens, myPassTotals.sec, myPassTotals.estimated)} · 🆕 ${myPassTotals.created} created · ✏️ ${myPassTotals.updated} updated`
                 ]);
             }
             if (myProcessedAny) await window.myRefreshFileList();
@@ -4666,6 +4668,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         let myAgProposals = [];
         let myAgRun = null;
         let myAgCallStats = null;
+        let myAgDropFormat = false;
         let myAgTimerId = null, myAgRunStart = 0;
         const MY_CODE_HANDLE_KEY = "codeFolderHandle";
         const myDemoFiles = {
@@ -4753,10 +4756,15 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 return myFull;
             }
             myAgAbort = new AbortController();
-            const myR = await fetch(MY_OLLAMA_BASE + "/api/chat", {
-                method: "POST", signal: myAgAbort.signal, headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ model: document.getElementById("myModelInput").value.trim(), messages: myMessages, stream: true, format: "json", options: { num_ctx: parseInt(document.getElementById("myAgCtx").value), num_predict: myMax } })
-            });
+            const myBodyObj = { model: document.getElementById("myModelInput").value.trim(), messages: myMessages, stream: true, think: false, options: { num_ctx: parseInt(document.getElementById("myAgCtx").value), num_predict: myMax } };
+            if (!myAgDropFormat) myBodyObj.format = "json";
+            const myPost = (myBody) => fetch(MY_OLLAMA_BASE + "/api/chat", { method: "POST", signal: myAgAbort.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify(myBody) });
+            let myR = await myPost(myBodyObj);
+            if (myR.status === 400) {
+                const myErr400 = await myR.text();
+                if (/think/i.test(myErr400)) { delete myBodyObj.think; myR = await myPost(myBodyObj); }
+                else throw new Error("Ollama HTTP 400: " + myErr400.slice(0, 200));
+            }
             if (myR.status === 404) throw new Error("Ollama model not found");
             if (!myR.ok) throw new Error("Ollama HTTP " + myR.status + ": " + (await myR.text()).slice(0, 200));
             const myReader = myR.body.getReader(); const myDec = new TextDecoder(); let myBuf = "";
@@ -5242,18 +5250,45 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 if (typeof v !== ty) throw new Error("argument '" + k + "' must be a " + ty);
             }
         };
-        const myAgParse = (myText) => {
-            const myS = myText.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-            try { return JSON.parse(myS); } catch (e) {}
-            const myStart = myS.indexOf("{");
-            if (myStart < 0) throw new Error("the reply contained no JSON object (it must start with {)");
-            let myDepth = 0, myInStr = false, myEsc = false;
-            for (let myI = myStart; myI < myS.length; myI++) {
-                const myCh = myS[myI];
-                if (myInStr) { if (myEsc) myEsc = false; else if (myCh === "\\") myEsc = true; else if (myCh === '"') myInStr = false; continue; }
-                if (myCh === '"') myInStr = true; else if (myCh === "{") myDepth++; else if (myCh === "}") { myDepth--; if (!myDepth) return JSON.parse(myS.slice(myStart, myI + 1)); }
+        // v019: tolerant parser. Removes <think> blocks and code fences, tries every "{" in the reply, and repairs the usual small-model slips
+        // (raw line breaks inside strings, trailing commas). A reply that is genuinely cut off is still reported, never guessed at.
+        const myAgRepairJson = (myT) => {
+            let myOut = "", myInStr = false, myEsc = false;
+            for (let myI = 0; myI < myT.length; myI++) {
+                const myCh = myT[myI];
+                if (myInStr) {
+                    if (myEsc) { myEsc = false; myOut += myCh; }
+                    else if (myCh === "\\") { myEsc = true; myOut += myCh; }
+                    else if (myCh === '"') { myInStr = false; myOut += myCh; }
+                    else if (myCh === "\n") myOut += "\\n";
+                    else if (myCh === "\r") myOut += "";
+                    else if (myCh === "\t") myOut += "\\t";
+                    else myOut += myCh;
+                } else { if (myCh === '"') myInStr = true; myOut += myCh; }
             }
-            throw new Error("the reply was cut off before the JSON ended (make smaller edits or raise the tokens setting)");
+            return myOut.replace(/,\s*([}\]])/g, "$1");
+        };
+        const myAgParse = (myText) => {
+            const myS = String(myText || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/```(?:json)?/gi, "").trim();
+            if (!myS) throw new Error("the model returned an empty reply (it may have spent all its tokens thinking: raise the tokens setting or try another model)");
+            const myTry = (myC) => { try { return JSON.parse(myC); } catch (e) {} try { return JSON.parse(myAgRepairJson(myC)); } catch (e) {} return undefined; };
+            const myWhole = myTry(myS); if (myWhole && typeof myWhole === "object") return myWhole;
+            let myAnyStart = false, myCutOff = false;
+            for (let myStart = myS.indexOf("{"); myStart >= 0; myStart = myS.indexOf("{", myStart + 1)) {
+                myAnyStart = true;
+                let myDepth = 0, myInStr = false, myEsc = false, myEnd = -1;
+                for (let myI = myStart; myI < myS.length; myI++) {
+                    const myCh = myS[myI];
+                    if (myInStr) { if (myEsc) myEsc = false; else if (myCh === "\\") myEsc = true; else if (myCh === '"') myInStr = false; continue; }
+                    if (myCh === '"') myInStr = true; else if (myCh === "{") myDepth++; else if (myCh === "}") { myDepth--; if (!myDepth) { myEnd = myI; break; } }
+                }
+                if (myEnd < 0) { myCutOff = true; continue; }
+                const myObj = myTry(myS.slice(myStart, myEnd + 1));
+                if (myObj && typeof myObj === "object" && Object.keys(myObj).length) return myObj;
+            }
+            if (!myAnyStart) throw new Error("the reply contained no JSON object (it must start with {)");
+            if (myCutOff) throw new Error("the reply was cut off before the JSON ended (make smaller edits or raise the tokens setting)");
+            throw new Error("the reply had a { but it was not valid JSON");
         };
         // Accepts {"tool":..}, {"name":..,"parameters":..}, arguments given as a JSON string, and {"answer":..} style finals
         const myAgNormalize = (myO) => {
@@ -5302,14 +5337,22 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         const myAgNote = (myText) => { if (!myAgRun) return; myAgRun.actions.push(myText); if (myAgRun.rep) myAgRun.rep.event("INFO", "You: " + myText); myAgChatRender(); };
         const myAgAddStats = (myMsgs, myText, myMs) => {
             const myR = myAgRun;
-            if (myAgCallStats && myAgCallStats.out) { myR.tokensOut += myAgCallStats.out; myR.tokensIn += myAgCallStats.inn; myR.genSec += myAgCallStats.sec > 0 ? myAgCallStats.sec : myMs / 1000; }
-            else { myR.estimated = true; myR.tokensOut += Math.ceil(myText.length / 4); myR.tokensIn += Math.ceil(myMsgs.reduce((n, m) => n + m.content.length, 0) / 4); myR.genSec += myMs / 1000; }
+            const mySecs = myMs / 1000;
+            if (myAgCallStats && myAgCallStats.out) { myR.tokensOut += myAgCallStats.out; myR.tokensIn += myAgCallStats.inn; myR.genSec += mySecs; return { tokens: myAgCallStats.out, sec: mySecs, approx: false }; }
+            const myEst = Math.ceil(myText.length / 4);
+            myR.estimated = true; myR.tokensOut += myEst; myR.tokensIn += Math.ceil(myMsgs.reduce((n, m) => n + m.content.length, 0) / 4); myR.genSec += mySecs;
+            return { tokens: myEst, sec: mySecs, approx: true };
         };
         const myAgFinishRun = (myOutcome, myError) => {
             if (!myAgRun) return;
             myAgRun.outcome = myOutcome; myAgRun.error = myError || ""; myAgRun.endMs = performance.now();
             myAgStopTimer();
-            if (myAgRun.rep) myAgRun.rep.finish({ completed: "COMPLETE", cancelled: "STOPPED", "step limit": "STOPPED", error: "FAILED" }[myOutcome] || "COMPLETE");
+            if (myAgRun.rep) {
+                const myBadge = { completed: "COMPLETE", cancelled: "STOPPED", "step limit": "STOPPED", error: "FAILED" }[myOutcome] || "COMPLETE";
+                const myApplied = myAgRun.changes.filter((c) => c.status === "applied").length, myWaiting = myAgRun.changes.filter((c) => c.status === "proposed").length;
+                myAgRun.rep.event(myBadge, "Run summary (" + myOutcome + "): " + myAgRun.step + " step(s) · " + myAgRun.retries + " invalid repl" + (myAgRun.retries === 1 ? "y" : "ies") + " · " + myAgRun.changes.length + " change(s) (" + myApplied + " applied, " + myWaiting + " waiting) · model " + myFmtRate(myAgRun.tokensOut, myAgRun.genSec, myAgRun.estimated) + " · job " + myFmtDur(myAgRun.endMs - myAgRun.startMs) + (myError ? " · " + myError : ""));
+                myAgRun.rep.finish(myBadge);
+            }
             myAgChatRender();
             myToolbarClockEnd({ completed: 'completed', cancelled: 'stopped', 'step limit': 'stopped at step limit', error: 'failed' }[myOutcome] || 'finished');
         };
@@ -5369,7 +5412,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
             myAgBusy = true; myAgCancelled = false; myAgSetState("connecting"); myAgOpenPanel();
             const myMax = Math.min(30, parseInt(document.getElementById("myAgMaxLoops").value) || 12);
             const myTask = document.getElementById("myAgTask").value;
-            myAgRun = myAgNewRun(myTask, myMax); myAgChatOpen(); myAgShowStep(); myAgStartTimer(); myAgChatRender();
+            myAgRun = myAgNewRun(myTask, myMax); myAgDropFormat = false; myAgChatOpen(); myAgShowStep(); myAgStartTimer(); myAgChatRender();
             let myOldPreface = null, myOutcome = "error", myErrText = "";
             try {
                 const myReadyOp = myAgRun.rep.start("INSPECTING", "Checking the " + myActiveBackendName() + " backend");
@@ -5388,12 +5431,13 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                     let myText; const myCallStart = performance.now();
                     try { myText = await myStreamModelResponse(myMsgs, (t) => { myAgSetState("streaming"); myPre.textContent = t; }); }
                     catch (e) { const myStop = myAgCancelled || e.name === "AbortError"; myAgRun.rep.end(myOp, false, myStop ? "Stopped by user" : "Model call failed: " + e.message); if (myStop) break; throw e; }
-                    myAgAddStats(myMsgs, myText, performance.now() - myCallStart);
+                    const myStepStat = myAgAddStats(myMsgs, myText, performance.now() - myCallStart);
+                    myAgRun.rep.event("GENERATING", "Step " + myStepNo + " model reply: " + myFmtRate(myStepStat.tokens, myStepStat.sec, myStepStat.approx));
                     if (myAgCancelled) { myAgRun.rep.end(myOp, false, "Stopped by user"); break; }
                     myMsgs.push({ role: "assistant", content: myText });
                     let myObj;
                     try { myObj = myAgNormalize(myAgParse(myText)); myAgValidate(myObj); }
-                    catch (e) { myAgRun.retries++; if (myAgRun.retries <= 8) myLimit++; myAgRun.rep.end(myOp, false, "Reply was not usable (" + e.message + "); asking again, this does not use up a step"); myAgLog("error", "invalid model response", e.message, true); myMsgs.push({ role: "user", content: "TOOL_ERROR: " + e.message + ". Reply with ONLY one JSON object that starts with { and has no other text. Example: {\"type\":\"tool_call\",\"id\":\"c1\",\"name\":\"list_files\",\"arguments\":{}}" }); continue; }
+                    catch (e) { myAgRun.retries++; if (myAgRun.retries <= 8) myLimit++; if (myAgRun.retries >= 2) myAgDropFormat = true; myAgRun.rep.end(myOp, false, "Reply was not usable (" + e.message + "); asking again (" + myAgRun.retries + "), this does not use up a step"); myAgRun.rep.event("INFO", "What the model sent back (" + myText.length + " characters)", myText.trim() ? myText.slice(0, 600) : "(empty reply)"); myAgLog("error", "invalid model response", e.message, true); myMsgs.push({ role: "user", content: "TOOL_ERROR: " + e.message + ". Reply with ONLY one JSON object that starts with { and has no other text. Example: {\"type\":\"tool_call\",\"id\":\"c1\",\"name\":\"list_files\",\"arguments\":{}}" }); continue; }
                     if (myObj.type === "final") {
                         const myNeed = [];
                         if (!myAgRun.filesRead.size) myNeed.push("read the relevant files with read_file");
