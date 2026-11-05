@@ -1,5 +1,5 @@
 // sw.js
-const myCacheName = "local-agentic-web-v018";   // change this version so the pwa will update.
+const myCacheName = "local-agentic-web-v019";   // change this version so the pwa will update.
 const myAssetsToCache = [
   "./",
   "./index.html",
