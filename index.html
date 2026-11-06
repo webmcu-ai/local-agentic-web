@@ -2018,7 +2018,7 @@ else if (f.type === 'video') {
                 const myModelObjUrl = URL.createObjectURL(myModelBlob);
 
               //  const { Engine } = await import('https://cdn.jsdelivr.net/npm/@litert-lm/core/+esm');   // to generic
-                const { Engine } = await import('https://cdn.jsdelivr.net/npm/@litert-lm/core@0.19.1/+esm');
+                const { Engine } = await import('https://cdn.jsdelivr.net/npm/@litert-lm/core@0.19.0/+esm');
 
                 myWebgpuCoreEngine = await Engine.create({
                     model: myModelObjUrl,
