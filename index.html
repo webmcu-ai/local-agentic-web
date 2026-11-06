@@ -1941,8 +1941,12 @@ else if (f.type === 'video') {
             if (myEngineKind === 'transformersjs') {
                 // ── Transformers.js (ONNX / WebGPU) — e.g. LFM2.5-2.6B-ONNX ──
                 const myRepoId = myResolveTfRepoId(myModelUrl);
-                const { AutoModelForCausalLM, AutoTokenizer, TextStreamer, StoppingCriteriaList, InterruptableStoppingCriteria } =
-                    await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/+esm');
+              //  const { AutoModelForCausalLM, AutoTokenizer, TextStreamer, StoppingCriteriaList, InterruptableStoppingCriteria } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/+esm');
+
+                const { AutoModelForCausalLM, AutoTokenizer, TextStreamer, StoppingCriteriaList, InterruptableStoppingCriteria } = 
+                     await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');     // note now could try   verison 4.3.2
+
+
 
                 myProgressStatus.textContent = `Loading tokenizer (${myRepoId})...`;
                 const myTokenizer = await AutoTokenizer.from_pretrained(myRepoId);
@@ -2012,7 +2016,9 @@ else if (f.type === 'video') {
                 myProgressStatus.textContent = 'Compiling WebGPU pipeline...';
                 const myModelObjUrl = URL.createObjectURL(myModelBlob);
 
-                const { Engine } = await import('https://cdn.jsdelivr.net/npm/@litert-lm/core/+esm');
+              //  const { Engine } = await import('https://cdn.jsdelivr.net/npm/@litert-lm/core/+esm');   // to generic
+                const { Engine } = await import('https://cdn.jsdelivr.net/npm/@litert-lm/core@0.19.1/+esm');
+
                 myWebgpuCoreEngine = await Engine.create({
                     model: myModelObjUrl,
                     mainExecutorSettings: { maxNumTokens: myMaxTokens }
