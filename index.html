@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v022</title>
+<title>Ollama Local AI + Agent — v024</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -67,6 +67,7 @@
             --radius:        6px;
             --radius-lg:     10px;
         }
+        :root { --my-page-width: 1100px; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: var(--font-ui);
@@ -82,7 +83,7 @@
 
         /* ── Header ── */
         .my-header {
-            width: 100%; max-width: 860px;
+            width: 100%; max-width: var(--my-page-width);
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px 0 8px;
             border-bottom: 1px solid var(--border);
@@ -135,7 +136,7 @@
 
         /* ── Setup Panel ── */
         .my-setup-panel {
-            width: 100%; max-width: 860px;
+            width: 100%; max-width: var(--my-page-width);
             background: var(--bg-panel);
             border: 1px solid var(--accent-orange);
             border-radius: var(--radius-lg); overflow: hidden;
@@ -182,7 +183,7 @@
 
         /* ── Config Panel ── */
         .my-config-panel {
-            width: 100%; max-width: 860px;
+            width: 100%; max-width: var(--my-page-width);
             background: var(--bg-panel); border: 1px solid var(--border);
             border-radius: var(--radius-lg); padding: 14px 16px;
             display: flex; flex-direction: column; gap: 12px;
@@ -202,6 +203,21 @@
         }
         .my-field input:focus, .my-field select:focus { border-color: var(--border-focus); }
         .my-field-grow { flex: 1; min-width: 180px; }
+        /* Full-row field: model text boxes stretch across the panel, other controls wrap below */
+        .my-field-full { flex: 1 1 100%; min-width: 0; }
+        .my-field-full input[type="text"], .my-field-full select { width: 100%; }
+
+        /* ── Flexible view: every big text area / list can be dragged taller or shorter ── */
+        textarea { resize: vertical; }
+        #myAgLog, #myFileListContainer { resize: vertical; overflow: auto; max-height: none !important; min-height: 80px; }
+        #myAgSerialIn { resize: vertical; min-height: 60px; }
+        .my-view-bar {
+            width: 100%; max-width: var(--my-page-width);
+            background: var(--bg-panel); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 10px 14px;
+            display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+        }
+        .my-view-bar input[type="range"] { width: 180px; }
         .my-field select { cursor: pointer; }
 
         .my-installed-list {
@@ -264,7 +280,7 @@
 
         /* ── Chat ── */
         .my-chat-wrap {
-            width: 100%; max-width: 860px;
+            width: 100%; max-width: var(--my-page-width);
             background: var(--bg-panel); border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             display: flex; flex-direction: column;
@@ -279,7 +295,8 @@
         }
         .my-chat-meta { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
         .my-chat-box {
-            height: 420px; overflow-y: auto; padding: 16px;
+            height: var(--my-chat-height, 420px); min-height: 150px; resize: vertical;
+            overflow-y: auto; padding: 16px;
             display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth;
         }
         .my-chat-box::-webkit-scrollbar { width: 6px; }
@@ -407,7 +424,7 @@
 
         /* ── Tools Panel ── */
         .my-tools-panel {
-            width: 100%; max-width: 860px;
+            width: 100%; max-width: var(--my-page-width);
             background: var(--bg-panel); border: 1px solid var(--border);
             border-radius: var(--radius-lg); overflow: hidden;
         }
@@ -463,6 +480,7 @@
             background: var(--bg-input); border: 1px solid var(--border);
             border-radius: var(--radius); padding: 12px; min-height: 60px;
             font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;
+            overflow: auto; resize: vertical;
         }
         .my-btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 
@@ -570,12 +588,42 @@
             <button class="my-backend-btn active" id="myBackendBtnOllama" onclick="window.mySetBackend('ollama')">🦙 Ollama</button>
             <button class="my-backend-btn" id="myBackendBtnWebgpu" onclick="window.mySetBackend('webgpu')">🌐 Webpage (WebGPU)</button>
         </div>
+        <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myToggleViewBar()" title="Page width, text size and chat height">👁 View</button>
         <div class="my-status-pill" onclick="window.myStatusPillClick()" title="Click to recheck / (re)compile" id="myStatusPill">
             <div class="my-status-dot checking" id="myStatusDot"></div>
             <span id="myStatusText">checking...</span>
         </div>
         <span id="myEngineChip" style="display:none; font-family:var(--font-mono); font-size:0.7rem; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--text-muted); white-space:nowrap;" title="Which local engine loaded the current WebGPU model"></span>
     </div>
+</div>
+
+<!-- View controls (page width, text size, chat height) -->
+<div class="my-view-bar my-panel-hidden" id="myViewBar">
+    <div class="my-field">
+        <label for="myViewWidthSelect">Page width</label>
+        <select id="myViewWidthSelect" onchange="window.myHandleViewChange()">
+            <option value="860px">Narrow (860 px)</option>
+            <option value="1100px">Normal (1100 px)</option>
+            <option value="1400px">Wide (1400 px)</option>
+            <option value="100%">Full window</option>
+        </select>
+    </div>
+    <div class="my-field">
+        <label for="myViewFontSelect">Text size</label>
+        <select id="myViewFontSelect" onchange="window.myHandleViewChange()">
+            <option value="85">Small</option>
+            <option value="100">Normal</option>
+            <option value="115">Large</option>
+            <option value="130">Extra large</option>
+        </select>
+    </div>
+    <div class="my-field">
+        <label for="myViewChatHeight">Chat height: <span id="myViewChatHeightLabel">420</span> px</label>
+        <input type="range" id="myViewChatHeight" min="150" max="1600" step="10" value="420" oninput="window.myHandleViewChange()" />
+    </div>
+    <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myFitChatToWindow()" title="Make the chat fill most of the window height">Fit chat to window</button>
+    <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myResetView()">Reset view</button>
+    <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted);">Tip: drag the bottom-right corner of the chat, text boxes and logs to resize them.</span>
 </div>
 
 <!-- Setup Panel: Ollama -->
@@ -687,11 +735,19 @@
 
     <!-- Row 1: model name + context window + pull button -->
     <div class="my-config-row">
-        <div class="my-field my-field-grow">
+        <div class="my-field my-field-full">
             <label for="myModelInput">Model</label>
             <input type="text" id="myModelInput" value="gemma4:12b"
                    placeholder="e.g. gemma4:12b, llama3:8b, mistral"
-                   oninput="window.mySaveConfig(); myUpdatePullBtn()" />
+                   oninput="window.mySaveConfig(); myUpdatePullBtn(); window.myOllamaSyncSelect(); myUpdateStatusBar()" />
+            <select id="myOllamaModelSelect" onchange="window.myHandleOllamaSelectChange()" aria-label="Suggested Ollama models" title="Optional: pick a suggestion to copy it into the box above. You can always type any Ollama model name.">
+                <option value="">Choose a suggested Ollama model...</option>
+                <option value="qwen2.5-coder:1.5b">qwen2.5-coder:1.5b</option>
+                <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
+                <option value="llama3.2:3b">llama3.2:3b</option>
+                <option value="gemma4:e2b">gemma4:e2b</option>
+                <option value="gemma4:12b">gemma4:12b</option>
+            </select>
         </div>
         <div class="my-field">
             <label for="myCtxSelect">Context Window</label>
@@ -726,9 +782,14 @@
 <div class="my-config-panel my-panel-hidden" id="myWebgpuConfigPanel">
 
     <div class="my-config-row">
-        <div class="my-field my-field-grow">
-            <label for="myWebgpuModelSelect">Model (downloads once, then cached locally)</label>
-            <select id="myWebgpuModelSelect" onchange="window.myHandleWebgpuModelSelectChange()">
+        <div class="my-field my-field-full">
+            <label for="myWebgpuModelInput">Model — paste a Hugging Face repo ID (org/model-name) or a direct .litertlm URL</label>
+            <input type="text" id="myWebgpuModelInput"
+                   value="https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm"
+                   placeholder="e.g. LiquidAI/LFM2.5-2.6B-ONNX  or  https://huggingface.co/.../model-web.litertlm"
+                   oninput="window.myHandleWebgpuModelInputChange()" />
+            <select id="myWebgpuModelSelect" onchange="window.myHandleWebgpuModelSelectChange()" aria-label="Suggested WebGPU models" title="Optional: pick a suggestion to copy it into the box above. Nothing is downloaded until you click Compile.">
+                <option value="">Choose a suggested Hugging Face model...</option>
                 <option value="https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm" data-engine="litertlm">
                     Gemma 4 E2B IT (Web Optimized · LiteRT-LM)
                 </option>
@@ -738,13 +799,18 @@
                 <option value="LiquidAI/LFM2.5-2.6B-ONNX" data-engine="transformersjs">
                     Liquid AI LFM2.5 2.6B (Transformers.js WebGPU, q4)
                 </option>
-                <option value="__custom__" id="myWebgpuCustomOptionSentinel">
-                    ✏️ Custom URL or HF repo ID...
-                </option>
             </select>
             <p style="color:var(--text-muted); font-size:0.72rem; margin:2px 0 0; font-family:var(--font-mono);">
-                LiteRT-LM models (.litertlm) cache via IndexedDB — see "Cached locally" below. Transformers.js models (Hugging Face repo IDs, e.g. org/repo) cache via the browser's own storage instead — not listed below, but still load offline after the first run.
+                Models download once, then cache locally. LiteRT-LM models (.litertlm) cache via IndexedDB — see "Cached locally" below. Transformers.js models (Hugging Face repo IDs) cache via the browser's own storage instead — not listed below, but still load offline after the first run.
             </p>
+        </div>
+        <div class="my-field">
+            <label for="myWebgpuEngineSelect">Engine</label>
+            <select id="myWebgpuEngineSelect" onchange="window.myHandleWebgpuEngineChange()" title="Set automatically from the model text; you can override it here.">
+                <option value="auto">Auto-detect</option>
+                <option value="litertlm" selected>LiteRT-LM (.litertlm file)</option>
+                <option value="transformersjs">Transformers.js (ONNX repo)</option>
+            </select>
         </div>
         <div class="my-field">
             <label for="myWebgpuMaxTokens">Max Tokens</label>
@@ -754,27 +820,6 @@
         </div>
         <button class="my-btn my-btn-primary" onclick="window.myInitializeWebgpuEngine()" id="myWebgpuCompileBtn" title="Download (if needed) and compile the model for local WebGPU inference">
             ⚙ Compile & Instantiate
-        </button>
-    </div>
-
-    <!-- Custom model entry: shown only when "Custom URL or HF repo ID..." is selected above -->
-    <div class="my-config-row my-panel-hidden" id="myWebgpuCustomRow">
-        <div class="my-field my-field-grow">
-            <label for="myWebgpuCustomUrlInput">Custom model — .litertlm URL or Hugging Face repo ID</label>
-            <input type="text" id="myWebgpuCustomUrlInput"
-                   placeholder="e.g. https://huggingface.co/.../model-web.litertlm  or  org/Some-Model-ONNX"
-                   oninput="window.mySaveConfig()" />
-        </div>
-        <div class="my-field">
-            <label for="myWebgpuCustomEngineSelect">Engine</label>
-            <select id="myWebgpuCustomEngineSelect" onchange="window.mySaveConfig()">
-                <option value="auto" selected>Auto-detect</option>
-                <option value="litertlm">LiteRT-LM (.litertlm file)</option>
-                <option value="transformersjs">Transformers.js (ONNX repo)</option>
-            </select>
-        </div>
-        <button class="my-btn my-btn-green" onclick="window.myLoadCustomWebgpuModel()" id="myWebgpuCustomLoadBtn" title="Add this model to the list above and load/compile it">
-            + Load
         </button>
     </div>
 
@@ -1647,12 +1692,12 @@ else if (f.type === 'video') {
             setupOpen:  document.getElementById('mySetupBody').classList.contains('open'),
             sysOpen:    document.getElementById('mySyspromptBody').classList.contains('open'),
             toolsOpen:  document.getElementById('myToolsBody').classList.contains('open'),
-            webgpuModel:        document.getElementById('myWebgpuModelSelect').value,
+            ollamaSuggested:    document.getElementById('myOllamaModelSelect').value,
+            webgpuModelText:    document.getElementById('myWebgpuModelInput').value,
+            webgpuEngine:       document.getElementById('myWebgpuEngineSelect').value,
+            webgpuSuggested:    document.getElementById('myWebgpuModelSelect').value,
             webgpuMaxTokens:    document.getElementById('myWebgpuMaxTokens').value,
             webgpuAutoActivate: document.getElementById('myWebgpuAutoActivate').checked,
-            webgpuCustomOptions: Array.from(document.getElementById('myWebgpuModelSelect').options)
-                .filter((o) => o.dataset && o.dataset.custom === 'true')
-                .map((o) => ({ value: o.value, label: o.textContent.trim(), engine: o.dataset.engine })),
         };
         localStorage.setItem(MY_STORAGE_KEY, JSON.stringify(myData));
     };
@@ -1679,28 +1724,24 @@ else if (f.type === 'video') {
             if (mySaved.webgpuMaxTokens) document.getElementById('myWebgpuMaxTokens').value = mySaved.webgpuMaxTokens;
             if (mySaved.webgpuAutoActivate) document.getElementById('myWebgpuAutoActivate').checked = true;
 
-            // Re-inject any custom model entries added in a previous session,
-            // then restore the select's value (must happen after re-injection
-            // or a saved custom value would silently fail to match an option).
-            if (Array.isArray(mySaved.webgpuCustomOptions)) {
-                const mySelectEl = document.getElementById('myWebgpuModelSelect');
-                const mySentinel = document.getElementById('myWebgpuCustomOptionSentinel');
-                mySaved.webgpuCustomOptions.forEach((myCustom) => {
-                    if (!myCustom || !myCustom.value) return;
-                    if (Array.from(mySelectEl.options).some((o) => o.value === myCustom.value)) return;
-                    const myOpt = document.createElement('option');
-                    myOpt.value = myCustom.value;
-                    myOpt.textContent = myCustom.label || myCustom.value;
-                    myOpt.dataset.engine = myCustom.engine || 'transformersjs';
-                    myOpt.dataset.custom = 'true';
-                    mySelectEl.insertBefore(myOpt, mySentinel);
-                });
+            // WebGPU model text is the source of truth. Restore it exactly as saved,
+            // even when it is not in the suggestion list. Older v022 saves only stored
+            // the dropdown value (webgpuModel), so fall back to that once.
+            let myRestoredText = null;
+            if (typeof mySaved.webgpuModelText === 'string') myRestoredText = mySaved.webgpuModelText;
+            else if (mySaved.webgpuModel && mySaved.webgpuModel !== '__custom__') myRestoredText = mySaved.webgpuModel;
+            else if (mySaved.webgpuCustomUrl) myRestoredText = mySaved.webgpuCustomUrl;
+            if (myRestoredText !== null) document.getElementById('myWebgpuModelInput').value = myRestoredText;
+
+            const myEngineEl = document.getElementById('myWebgpuEngineSelect');
+            if (mySaved.webgpuEngine && Array.from(myEngineEl.options).some((o) => o.value === mySaved.webgpuEngine)) {
+                myEngineEl.value = mySaved.webgpuEngine;
+            } else {
+                const myDetected = window.myDetectWebgpuEngine(document.getElementById('myWebgpuModelInput').value);
+                if (myDetected) myEngineEl.value = myDetected;
             }
-            if (mySaved.webgpuModel) document.getElementById('myWebgpuModelSelect').value = mySaved.webgpuModel;
-            document.getElementById('myWebgpuCustomRow').classList.toggle(
-                'my-panel-hidden',
-                document.getElementById('myWebgpuModelSelect').value !== '__custom__'
-            );
+            window.myWebgpuSyncSelect();
+            window.myOllamaSyncSelect();
         } catch(e) { /* corrupt storage — ignore */ }
 
         // Restore last backend choice (defaults to 'ollama' the very first time)
@@ -1725,12 +1766,81 @@ else if (f.type === 'video') {
     let myWebgpuIsCompiling = false;
     let myWebgpuEngineKind = null; // 'litertlm' | 'transformersjs' — set once the active engine compiles
 
-    // Which loader a given model needs. Curated options carry an explicit
-    // data-engine attribute; custom entries fall back to sniffing the value
-    // itself (a .litertlm URL vs. a Hugging Face repo ID / URL).
+    // Guesses the loader from the model text itself. Returns '' when it cannot tell.
+    //   .litertlm URL                          -> litertlm
+    //   Hugging Face repo ID / HF URL / .onnx  -> transformersjs
+    window.myDetectWebgpuEngine = (myValue) => {
+        const myV = (myValue || '').trim();
+        if (!myV) return '';
+        if (/\.litertlm(\?|#|$)/i.test(myV)) return 'litertlm';
+        if (/huggingface\.co\//i.test(myV) || /\.onnx(\?|#|$)/i.test(myV) || /^[\w.-]+\/[\w.-]+$/.test(myV)) return 'transformersjs';
+        return '';
+    };
+
+    // Kept for compatibility: the engine select wins, detection is only a fallback.
     const myResolveWebgpuEngineKind = (myOptionEl, myValue) => {
-        if (myOptionEl && myOptionEl.dataset && myOptionEl.dataset.engine) return myOptionEl.dataset.engine;
-        return /\.litertlm(\?|$)/i.test((myValue || '').trim()) ? 'litertlm' : 'transformersjs';
+        const myChoice = document.getElementById('myWebgpuEngineSelect').value;
+        if (myChoice === 'litertlm' || myChoice === 'transformersjs') return myChoice;
+        return window.myDetectWebgpuEngine(myValue) || 'transformersjs';
+    };
+
+    // Copies a suggestion into the text box + engine select. Never downloads anything.
+    window.myHandleWebgpuModelSelectChange = () => {
+        const mySelectEl = document.getElementById('myWebgpuModelSelect');
+        const myOpt = mySelectEl.options[mySelectEl.selectedIndex];
+        if (!mySelectEl.value) return;
+        document.getElementById('myWebgpuModelInput').value = mySelectEl.value;
+        const myEngine = (myOpt && myOpt.dataset.engine) || window.myDetectWebgpuEngine(mySelectEl.value);
+        if (myEngine) document.getElementById('myWebgpuEngineSelect').value = myEngine;
+        window.mySaveConfig();
+        myUpdateStatusBar();
+    };
+
+    // Manual typing/pasting: keep the text exactly, guess the engine, save.
+    window.myHandleWebgpuModelInputChange = () => {
+        const myText = document.getElementById('myWebgpuModelInput').value;
+        const myDetected = window.myDetectWebgpuEngine(myText);
+        if (myDetected) document.getElementById('myWebgpuEngineSelect').value = myDetected;
+        window.myWebgpuSyncSelect();
+        window.mySaveConfig();
+        myUpdateStatusBar();
+    };
+
+    window.myHandleWebgpuEngineChange = () => { window.mySaveConfig(); };
+
+    // Shows the matching suggestion if the text equals one, otherwise the placeholder.
+    // Only the dropdown changes here; the text box is never touched.
+    window.myWebgpuSyncSelect = () => {
+        const myText = document.getElementById('myWebgpuModelInput').value.trim();
+        const mySelectEl = document.getElementById('myWebgpuModelSelect');
+        const myMatch = Array.from(mySelectEl.options).find((o) => o.value && o.value === myText);
+        mySelectEl.value = myMatch ? myMatch.value : '';
+    };
+
+    // Short readable name for the status bar and chat labels.
+    window.myWebgpuModelLabel = () => {
+        const myText = document.getElementById('myWebgpuModelInput').value.trim();
+        const mySelectEl = document.getElementById('myWebgpuModelSelect');
+        const myMatch = Array.from(mySelectEl.options).find((o) => o.value && o.value === myText);
+        if (myMatch) return myMatch.textContent.trim();
+        if (!myText) return 'no model set';
+        return myText.length > 60 ? ('…' + myText.slice(-57)) : myText;
+    };
+
+    // Ollama: copy a suggestion into the text box (the box stays the source of truth).
+    window.myHandleOllamaSelectChange = () => {
+        const myValue = document.getElementById('myOllamaModelSelect').value;
+        if (!myValue) return;
+        document.getElementById('myModelInput').value = myValue;
+        window.mySaveConfig();
+        myUpdatePullBtn();
+        myUpdateStatusBar();
+    };
+    window.myOllamaSyncSelect = () => {
+        const myText = document.getElementById('myModelInput').value.trim();
+        const mySelectEl = document.getElementById('myOllamaModelSelect');
+        const myMatch = Array.from(mySelectEl.options).find((o) => o.value && o.value === myText);
+        mySelectEl.value = myMatch ? myMatch.value : '';
     };
 
     // Accepts either a bare "org/repo" id or a full huggingface.co URL and
@@ -1867,9 +1977,16 @@ else if (f.type === 'video') {
                 myTag.title = 'Click to select — already downloaded, no fetch needed';
                 myTag.onclick = () => {
                     for (const myOpt of mySelect.options) {
-                        if (myOpt.value.endsWith('/' + myKey) || myOpt.value === myKey) { mySelect.value = myOpt.value; break; }
+                        if (myOpt.value && (myOpt.value.endsWith('/' + myKey) || myOpt.value === myKey)) {
+                            document.getElementById('myWebgpuModelInput').value = myOpt.value;
+                            const myEng = myOpt.dataset.engine || window.myDetectWebgpuEngine(myOpt.value);
+                            if (myEng) document.getElementById('myWebgpuEngineSelect').value = myEng;
+                            window.myWebgpuSyncSelect();
+                            break;
+                        }
                     }
                     window.mySaveConfig();
+                    myUpdateStatusBar();
                 };
                 myList.appendChild(myTag);
             });
@@ -1910,11 +2027,34 @@ else if (f.type === 'video') {
     window.myInitializeWebgpuEngine = async () => {
         if (myWebgpuIsCompiling) return;
 
-        const mySelectEl = document.getElementById('myWebgpuModelSelect');
-        const myModelUrl = mySelectEl.value;
+        // The text box is the only source of the model; the dropdown is just a suggestion tool.
+        const myModelUrl = document.getElementById('myWebgpuModelInput').value.trim();
+        const myEngineChoice = document.getElementById('myWebgpuEngineSelect').value;
+        const myEngineKind = (myEngineChoice === 'litertlm' || myEngineChoice === 'transformersjs')
+            ? myEngineChoice
+            : window.myDetectWebgpuEngine(myModelUrl);
 
-        if (myModelUrl === '__custom__') {
-            alert('Type a .litertlm URL or Hugging Face repo ID in the box below, then click "+ Load" — that adds it to the list and loads it in one step.');
+        const myInputError = (() => {
+            if (!myModelUrl) return 'Model box is empty. Paste a Hugging Face repo ID (org/model-name) or a direct .litertlm URL.';
+            if (!myEngineKind) return 'Could not tell which engine this model needs. Choose LiteRT-LM or Transformers.js in the Engine list.';
+            if (myEngineKind === 'litertlm' && !/^https?:\/\/.+\.litertlm(\?|#|$)/i.test(myModelUrl)) {
+                return 'LiteRT-LM needs a direct http(s) URL ending in .litertlm. For a Hugging Face repo ID, choose the Transformers.js engine.';
+            }
+            if (myEngineKind === 'transformersjs') {
+                if (/\.litertlm(\?|#|$)/i.test(myModelUrl)) return 'A .litertlm file needs the LiteRT-LM engine, not Transformers.js.';
+                if (!/^[\w.-]+\/[\w.-]+$/.test(myResolveTfRepoId(myModelUrl))) {
+                    return 'Transformers.js needs a Hugging Face repo ID like organization/model-name (or a huggingface.co URL).';
+                }
+            }
+            return '';
+        })();
+        if (myInputError) {
+            const myErrWrap = document.getElementById('myWebgpuProgressWrap');
+            myErrWrap.classList.add('visible');
+            document.getElementById('myWebgpuProgressBar').style.width = '0%';
+            document.getElementById('myWebgpuProgressPct').textContent = '0%';
+            document.getElementById('myWebgpuProgressStatus').textContent = `Cannot load: ${myInputError}`;
+            alert(myInputError);
             return;
         }
 
@@ -1924,8 +2064,6 @@ else if (f.type === 'video') {
         const myCompileBtn = document.getElementById('myWebgpuCompileBtn');
         myCompileBtn.disabled = true;
 
-        const myModelOpt = mySelectEl.options[mySelectEl.selectedIndex];
-        const myEngineKind = myResolveWebgpuEngineKind(myModelOpt, myModelUrl);
         const myMaxTokens = parseInt(document.getElementById('myWebgpuMaxTokens').value, 10) || 4096;
 
         const myProgressWrap = document.getElementById('myWebgpuProgressWrap');
@@ -2056,46 +2194,10 @@ else if (f.type === 'video') {
         }
     };
 
-    // Adds a custom .litertlm URL / Hugging Face repo ID as a real option in
-    // the model list (so it persists and behaves exactly like a curated
-    // entry), selects it, then immediately loads it.
+    // Kept for older callers: the text box already holds the custom model, so just load it.
     window.myLoadCustomWebgpuModel = () => {
-        const myUrlInput = document.getElementById('myWebgpuCustomUrlInput');
-        const myEngineSelect = document.getElementById('myWebgpuCustomEngineSelect');
-        const myValue = myUrlInput.value.trim();
-        if (!myValue) { alert('Enter a .litertlm URL or a Hugging Face repo ID first.'); return; }
-
-        const myEngineChoice = myEngineSelect.value; // 'auto' | 'litertlm' | 'transformersjs'
-        const myResolvedEngine = (myEngineChoice === 'auto')
-            ? myResolveWebgpuEngineKind(null, myValue)
-            : myEngineChoice;
-
-        const mySelectEl = document.getElementById('myWebgpuModelSelect');
-        let myOpt = Array.from(mySelectEl.options).find((o) => o.value === myValue);
-        if (!myOpt) {
-            myOpt = document.createElement('option');
-            myOpt.value = myValue;
-            const myShortLabel = myValue.length > 60 ? ('…' + myValue.slice(-57)) : myValue;
-            myOpt.textContent = `${myShortLabel} (custom · ${myResolvedEngine === 'litertlm' ? 'LiteRT-LM' : 'Transformers.js'})`;
-            myOpt.dataset.engine = myResolvedEngine;
-            myOpt.dataset.custom = 'true';
-            const mySentinel = document.getElementById('myWebgpuCustomOptionSentinel');
-            mySelectEl.insertBefore(myOpt, mySentinel);
-        }
-
-        mySelectEl.value = myValue;
-        document.getElementById('myWebgpuCustomRow').classList.add('my-panel-hidden');
         window.mySaveConfig();
         window.myInitializeWebgpuEngine();
-    };
-
-    // Shows/hides the custom-entry row when "Custom URL or HF repo ID..." is
-    // picked from the dropdown, otherwise behaves like the old plain onchange.
-    window.myHandleWebgpuModelSelectChange = () => {
-        const mySelectEl = document.getElementById('myWebgpuModelSelect');
-        const myCustomRow = document.getElementById('myWebgpuCustomRow');
-        myCustomRow.classList.toggle('my-panel-hidden', mySelectEl.value !== '__custom__');
-        window.mySaveConfig();
     };
 
     // Non-streaming ask, used by the agent-folder loop. Reuses the streaming
@@ -2151,6 +2253,7 @@ else if (f.type === 'video') {
             myTag.onclick = () => {
                 document.getElementById('myModelInput').value = myM.name;
                 window.mySaveConfig();
+                window.myOllamaSyncSelect();
                 myUpdateStatusBar();
                 myUpdatePullBtn();
             };
@@ -2324,9 +2427,7 @@ else if (f.type === 'video') {
 
     const myUpdateStatusBar = () => {
         if (myBackendMode === 'webgpu') {
-            const mySel = document.getElementById('myWebgpuModelSelect');
-            document.getElementById('myActiveModel').textContent =
-                mySel.options[mySel.selectedIndex].text.trim();
+            document.getElementById('myActiveModel').textContent = window.myWebgpuModelLabel();
             document.getElementById('myActiveCtx').textContent =
                 parseInt(document.getElementById('myWebgpuMaxTokens').value || '0', 10).toLocaleString();
         } else {
@@ -2773,7 +2874,7 @@ const myEvidenceFound = (myEvidence, myFileText) => {
 
         const myIsWebgpuBackend = (myBackendMode === 'webgpu');
         const myModelName = myIsWebgpuBackend
-            ? document.getElementById('myWebgpuModelSelect').options[document.getElementById('myWebgpuModelSelect').selectedIndex].text.trim()
+            ? window.myWebgpuModelLabel()
             : (document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL);
         const mySysPrompt = document.getElementById('mySysPromptInput').value.trim();
         const myNumCtx    = parseInt(document.getElementById('myCtxSelect').value, 10);
@@ -3659,10 +3760,7 @@ exactly as shown for every file.`;
     const myActiveBackendName = () => myBackendMode === 'webgpu' ? 'WebGPU' : 'Ollama';
     const myActiveModelName = () => {
         if (myBackendMode === 'webgpu') {
-            const mySel = document.getElementById('myWebgpuModelSelect');
-            if (mySel.value === '__custom__') return document.getElementById('myWebgpuCustomUrlInput').value.trim() || 'custom model';
-            const myOpt = mySel.options[mySel.selectedIndex];
-            return (myOpt ? myOpt.textContent : mySel.value).trim().slice(0, 60);
+            return window.myWebgpuModelLabel().slice(0, 60);
         }
         return document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL;
     };
@@ -4666,6 +4764,62 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
     };
 
     // ── Init ──────────────────────────────────────────────────────────
+    // ── View settings (page width, text size, chat height) — saved separately from model config ──
+    const MY_VIEW_KEY = 'myViewSettings024';
+    const MY_VIEW_DEFAULTS = { width: '1100px', font: '100', chatHeight: 420 };
+    let myViewSettings = Object.assign({}, MY_VIEW_DEFAULTS);
+
+    window.myApplyViewSettings = () => {
+        document.documentElement.style.setProperty('--my-page-width', myViewSettings.width);
+        document.documentElement.style.fontSize = myViewSettings.font + '%';
+        document.documentElement.style.setProperty('--my-chat-height', myViewSettings.chatHeight + 'px');
+        const myChatBox = document.getElementById('myChatBox');
+        if (myChatBox) myChatBox.style.height = myViewSettings.chatHeight + 'px';
+        document.getElementById('myViewWidthSelect').value = myViewSettings.width;
+        document.getElementById('myViewFontSelect').value = myViewSettings.font;
+        document.getElementById('myViewChatHeight').value = myViewSettings.chatHeight;
+        document.getElementById('myViewChatHeightLabel').textContent = myViewSettings.chatHeight;
+    };
+    const mySaveViewSettings = () => {
+        try { localStorage.setItem(MY_VIEW_KEY, JSON.stringify(myViewSettings)); } catch (e) {}
+    };
+    window.myHandleViewChange = () => {
+        myViewSettings.width = document.getElementById('myViewWidthSelect').value;
+        myViewSettings.font = document.getElementById('myViewFontSelect').value;
+        myViewSettings.chatHeight = parseInt(document.getElementById('myViewChatHeight').value, 10) || 420;
+        window.myApplyViewSettings();
+        mySaveViewSettings();
+    };
+    window.myFitChatToWindow = () => {
+        myViewSettings.chatHeight = Math.max(150, Math.min(1600, Math.round(window.innerHeight - 220)));
+        window.myApplyViewSettings();
+        mySaveViewSettings();
+    };
+    window.myResetView = () => {
+        myViewSettings = Object.assign({}, MY_VIEW_DEFAULTS);
+        window.myApplyViewSettings();
+        mySaveViewSettings();
+    };
+    window.myToggleViewBar = () => { document.getElementById('myViewBar').classList.toggle('my-panel-hidden'); };
+    window.myInitView = () => {
+        try { Object.assign(myViewSettings, JSON.parse(localStorage.getItem(MY_VIEW_KEY) || '{}')); } catch (e) {}
+        window.myApplyViewSettings();
+        // Dragging the chat box corner changes its height directly — remember the new size.
+        const myChatBox = document.getElementById('myChatBox');
+        const myRememberDrag = () => {
+            const myH = Math.round(myChatBox.offsetHeight);
+            if (myH >= 150 && myH !== myViewSettings.chatHeight) {
+                myViewSettings.chatHeight = Math.min(myH, 1600);
+                document.getElementById('myViewChatHeight').value = myViewSettings.chatHeight;
+                document.getElementById('myViewChatHeightLabel').textContent = myViewSettings.chatHeight;
+                mySaveViewSettings();
+            }
+        };
+        myChatBox.addEventListener('mouseup', myRememberDrag);
+        myChatBox.addEventListener('touchend', myRememberDrag);
+    };
+    window.myInitView();
+
     myLoadConfig(); // also restores backend choice and pings the right status check
     window.myUpdatePipelineModeUI();
     document.getElementById('myUserInput').focus();
@@ -4733,7 +4887,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
             myM.value = document.getElementById("myModelInput").value.trim();
         };
         window.myAgPickPreset = () => { const myT = myAgPresets[document.getElementById("myAgPreset").value].task; if (myT) document.getElementById("myAgTask").value = myT; };
-        window.myAgPickModel = () => { const myV = document.getElementById("myAgModelPick").value; if (!myV) return; document.getElementById("myModelInput").value = myV; if (window.mySaveConfig) window.mySaveConfig(); window.myCheckOllamaStatus(); };
+        window.myAgPickModel = () => { const myV = document.getElementById("myAgModelPick").value; if (!myV) return; document.getElementById("myModelInput").value = myV; if (window.mySaveConfig) window.mySaveConfig(); if (window.myOllamaSyncSelect) window.myOllamaSyncSelect(); window.myCheckOllamaStatus(); };
         window.myAgTogglePanel = () => { const myB = document.getElementById("myAgPanelBody"); document.getElementById("myAgPanelLabel").textContent = myB.classList.toggle("open") ? "▲ hide" : "▼ show"; };
 
         const myAgEnsureReady = async () => {
