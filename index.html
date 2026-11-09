@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v027</title>
+<title>Ollama Local AI + Agent — v028</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -889,7 +889,7 @@
                 <select id="myImgModelSelect" onchange="window.myImgPickSuggestion()" aria-label="Suggested image models">
                     <option value="">Choose a suggested image model...</option>
                     <option value="onnx-community/Janus-Pro-1B-ONNX" data-engine="janus">Janus-Pro-1B (text-to-image only, ~2.4 GB)</option>
-                    <option value="Zhare-AI/sd-1-5-webgpu" data-engine="sd15i2i">SD 1.5 WebGPU — has a VAE encoder for img2img (engine not implemented yet)</option>
+                    <option value="schmuell/sd-turbo-ort-web" data-engine="sdturbo">SD-Turbo (ONNX Runtime Web, 512x512, text-to-image + img2img, ~2.6 GB)</option>
                 </select>
             </div>
             <div class="my-field">
@@ -4883,6 +4883,111 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
     // ── Image generation (v025) — modular engines, own state, independent of the text models ──
     // Each engine: { label, img2img (true only if the previous image really conditions generation), load(), generate() }.
     // Only Janus-Pro-1B is implemented (text-to-image). The SD engines are listed but disabled until verified.
+    // ── SD-Turbo engine helpers (same ONNX Runtime Web approach as image-only-v004.html) ──
+    // The VAE encoder (needed to feed the previous frame back in) comes from the SD 1.5 WebGPU repo:
+    // SD 1.5 and SD-Turbo (SD 2.1 based) share the same VAE encoder weights.
+    const MY_SD_VAE_ENCODER_URL = 'https://huggingface.co/Zhare-AI/sd-1-5-webgpu/resolve/main/onnx/vae_encoder.onnx';
+    const myImgLoadScript = (myUrl) => new Promise((myOk, myFail) => {
+        const myS = document.createElement('script');
+        myS.src = myUrl; myS.onload = myOk; myS.onerror = () => myFail(new Error('Could not load ' + myUrl));
+        document.head.appendChild(myS);
+    });
+    const myImgFetchModel = async (myUrl, myLabel, myBasePct, mySpanPct, myApproxMb, myProgress) => {
+        let myCache = null;
+        try { myCache = await caches.open('my-sd-turbo-cache'); } catch (e) {}
+        let myResp = myCache ? await myCache.match(myUrl) : null;
+        if (myResp) { myProgress({ status: 'progress', progress: myBasePct + mySpanPct, file: myLabel + ' (cached)' }); return await myResp.arrayBuffer(); }
+        myResp = await fetch(myUrl);
+        if (!myResp.ok) throw new Error(myLabel + ' download failed: HTTP ' + myResp.status);
+        const myTotal = parseInt(myResp.headers.get('Content-Length')) || myApproxMb * 1e6;
+        const myReader = myResp.body.getReader(), myChunks = [];
+        let myLoaded = 0;
+        while (true) {
+            const { done, value } = await myReader.read();
+            if (done) break;
+            myChunks.push(value); myLoaded += value.length;
+            myProgress({ status: 'progress', progress: myBasePct + mySpanPct * Math.min(myLoaded / myTotal, 1), file: myLabel });
+        }
+        const myBuf = new Uint8Array(myLoaded);
+        let myOff = 0;
+        for (const myC of myChunks) { myBuf.set(myC, myOff); myOff += myC.length; }
+        if (myCache) { try { await myCache.put(myUrl, new Response(myBuf)); } catch (e) {} }
+        return myBuf.buffer;
+    };
+    const myRandn = (myCount) => {
+        const myOut = new Float32Array(myCount);
+        for (let myI = 0; myI < myCount; myI += 2) {
+            const myU1 = Math.random() || 1e-12, myU2 = Math.random(), myR = Math.sqrt(-2 * Math.log(myU1));
+            myOut[myI] = myR * Math.cos(2 * Math.PI * myU2);
+            if (myI + 1 < myCount) myOut[myI + 1] = myR * Math.sin(2 * Math.PI * myU2);
+        }
+        return myOut;
+    };
+    // Noise level (sigma) for a timestep, from the standard Stable Diffusion schedule. Timestep 999 gives 14.6146.
+    const mySdSigma = (myT) => {
+        const myA = Math.sqrt(0.00085), myB = Math.sqrt(0.012);
+        let myC = 1;
+        for (let myI = 0; myI <= myT; myI++) myC *= 1 - Math.pow(myA + (myB - myA) * myI / 999, 2);
+        return Math.sqrt((1 - myC) / myC);
+    };
+    const myToHalf = (myF32) => {
+        const myOut = new Uint16Array(myF32.length), myF = new Float32Array(1), myU = new Uint32Array(myF.buffer);
+        for (let myI = 0; myI < myF32.length; myI++) {
+            myF[0] = myF32[myI];
+            const myX = myU[0], mySign = (myX >>> 16) & 0x8000, myExp = ((myX >>> 23) & 0xff) - 112;
+            myOut[myI] = myExp <= 0 ? mySign : myExp >= 31 ? (mySign | 0x7c00) : (mySign | (myExp << 10) | ((myX >>> 13) & 0x3ff));
+        }
+        return myOut;
+    };
+    const myFromHalf = (myU16) => {
+        const myOut = new Float32Array(myU16.length);
+        for (let myI = 0; myI < myU16.length; myI++) {
+            const myH = myU16[myI], myS = (myH & 0x8000) ? -1 : 1, myE = (myH >> 10) & 0x1f, myM = myH & 0x3ff;
+            myOut[myI] = myE === 0 ? myS * Math.pow(2, -14) * (myM / 1024) : myE === 31 ? (myM ? NaN : myS * Infinity) : myS * Math.pow(2, myE - 15) * (1 + myM / 1024);
+        }
+        return myOut;
+    };
+    const myImgToPixels = async (myBlob) => {
+        const myBmp = await createImageBitmap(myBlob);
+        const myCanvas = document.createElement('canvas');
+        myCanvas.width = 512; myCanvas.height = 512;
+        const myCtx = myCanvas.getContext('2d'), myS = Math.min(myBmp.width, myBmp.height);
+        myCtx.drawImage(myBmp, (myBmp.width - myS) / 2, (myBmp.height - myS) / 2, myS, myS, 0, 0, 512, 512);
+        const myPx = myCtx.getImageData(0, 0, 512, 512).data, myPlane = 512 * 512, myOut = new Float32Array(3 * myPlane);
+        for (let myI = 0; myI < myPlane; myI++) {
+            myOut[myI] = myPx[myI * 4] / 127.5 - 1;
+            myOut[myPlane + myI] = myPx[myI * 4 + 1] / 127.5 - 1;
+            myOut[2 * myPlane + myI] = myPx[myI * 4 + 2] / 127.5 - 1;
+        }
+        return myOut;
+    };
+    const myImgPixelsToBlob = (myData) => {
+        const myPlane = 512 * 512, myCanvas = document.createElement('canvas');
+        myCanvas.width = 512; myCanvas.height = 512;
+        const myCtx = myCanvas.getContext('2d'), myImg = myCtx.createImageData(512, 512);
+        const myClamp = (myV) => Math.max(0, Math.min(255, Math.round((myV / 2 + 0.5) * 255)));
+        for (let myI = 0; myI < myPlane; myI++) {
+            myImg.data[myI * 4] = myClamp(myData[myI]);
+            myImg.data[myI * 4 + 1] = myClamp(myData[myPlane + myI]);
+            myImg.data[myI * 4 + 2] = myClamp(myData[2 * myPlane + myI]);
+            myImg.data[myI * 4 + 3] = 255;
+        }
+        myCtx.putImageData(myImg, 0, 0);
+        return new Promise((myOk) => myCanvas.toBlob(myOk, 'image/png'));
+    };
+    // Image -> 4x64x64 latents. Input/output names are read from the model; fp16 is tried if fp32 input is rejected.
+    const myEncodeImage = async (mySession, myPix) => {
+        const myName = mySession.inputNames[0];
+        let myRes;
+        try { myRes = await mySession.run({ [myName]: new ort.Tensor('float32', myPix, [1, 3, 512, 512]) }); }
+        catch (myErr) { myRes = await mySession.run({ [myName]: new ort.Tensor('float16', myToHalf(myPix), [1, 3, 512, 512]) }); }
+        const myT = myRes[mySession.outputNames[0]];
+        const myD = (myT.type === 'float16' ? myFromHalf(myT.data) : Float32Array.from(myT.data)).slice(0, 4 * 64 * 64); // keep the 4 mean channels if 8 are returned
+        let mySum = 0;
+        for (let myI = 0; myI < myD.length; myI++) mySum += myD[myI] * myD[myI];
+        if (Math.sqrt(mySum / myD.length) > 2.5) for (let myI = 0; myI < myD.length; myI++) myD[myI] *= 0.18215; // encoder returned unscaled latents
+        return myD;
+    };
     const myImgEngines = {
         janus: {
             label: 'Janus-Pro-1B (Transformers.js) — text to image only', img2img: false,
@@ -4903,7 +5008,58 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 return await myOut[0].toBlob();
             }
         },
-        sdturbo: { label: 'SD-Turbo (ONNX Runtime Web) — not implemented yet', img2img: false, disabled: true },
+        sdturbo: {
+            label: 'SD-Turbo (ONNX Runtime Web) — text to image + img2img', img2img: true,
+            load: async (myModelId, myProgress) => {
+                if (!window.ort) await myImgLoadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js');
+                const { AutoTokenizer } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+                const myTokenizer = await AutoTokenizer.from_pretrained('Xenova/clip-vit-base-patch16');
+                ort.env.wasm.numThreads = 1;
+                const myBase = 'https://huggingface.co/' + (myModelId.includes('/') ? myModelId : 'schmuell/sd-turbo-ort-web') + '/resolve/main';
+                const myPlan = [
+                    ['textEncoder', 'text encoder', myBase + '/text_encoder/model.onnx', 1700, 0, 50, { batch_size: 1 }],
+                    ['unet', 'UNet', myBase + '/unet/model.onnx', 640, 50, 20, { batch_size: 1, num_channels: 4, height: 64, width: 64, sequence_length: 77 }],
+                    ['vaeDecoder', 'VAE decoder', myBase + '/vae_decoder/model.onnx', 95, 70, 10, { batch_size: 1, num_channels_latent: 4, height_latent: 64, width_latent: 64 }],
+                    ['vaeEncoder', 'VAE encoder', MY_SD_VAE_ENCODER_URL, 170, 80, 20, { batch_size: 1, num_channels: 3, height: 512, width: 512 }]
+                ];
+                const mySessions = {};
+                for (const [myKey, myLabel, myUrl, myMb, myStartPct, mySpan, myDims] of myPlan) {
+                    try {
+                        const myBytes = await myImgFetchModel(myUrl, myLabel, myStartPct, mySpan, myMb, myProgress);
+                        mySessions[myKey] = await ort.InferenceSession.create(myBytes, { executionProviders: ['webgpu'], enableMemPattern: false, enableCpuMemArena: false, freeDimensionOverrides: myDims });
+                    } catch (myErr) {
+                        if (myKey !== 'vaeEncoder') throw myErr;
+                        mySessions.vaeEncoder = null; // text-to-image still works; only persistent frames need the encoder
+                        console.warn('VAE encoder failed to load:', myErr);
+                    }
+                }
+                return { myTokenizer, mySessions };
+            },
+            generate: async (myState, myOpts) => {
+                const mySess = myState.mySessions;
+                const myTok = await myState.myTokenizer(myOpts.prompt, { padding: 'max_length', max_length: 77, truncation: true, return_tensor: false });
+                const myIds = Int32Array.from(myTok.input_ids);
+                const myEnc = await mySess.textEncoder.run({ input_ids: new ort.Tensor('int32', myIds, [1, myIds.length]) });
+                let myT = 999, myBaseLat = new Float32Array(4 * 64 * 64);
+                if (myOpts.initImage) {
+                    if (!mySess.vaeEncoder) throw new Error('The VAE encoder did not load, so the previous image cannot be used. See the browser console.');
+                    myBaseLat = await myEncodeImage(mySess.vaeEncoder, await myImgToPixels(myOpts.initImage));
+                    myT = Math.max(1, Math.min(999, Math.round(999 * myOpts.strength)));
+                }
+                const mySigma = mySdSigma(myT), myNoise = myRandn(myBaseLat.length), myLat = new Float32Array(myBaseLat.length);
+                for (let myI = 0; myI < myLat.length; myI++) myLat[myI] = myBaseLat[myI] + myNoise[myI] * mySigma;
+                const myScale = 1 / Math.sqrt(mySigma * mySigma + 1);
+                const myUnetOut = await mySess.unet.run({
+                    sample: new ort.Tensor('float32', myLat.map((myV) => myV * myScale), [1, 4, 64, 64]),
+                    timestep: new ort.Tensor('int64', BigInt64Array.from([BigInt(myT)]), [1]),
+                    encoder_hidden_states: myEnc.last_hidden_state
+                });
+                const myEps = myUnetOut.out_sample.data, myDen = new Float32Array(myLat.length);
+                for (let myI = 0; myI < myDen.length; myI++) myDen[myI] = (myLat[myI] - mySigma * myEps[myI]) / 0.18215;
+                const myVae = await mySess.vaeDecoder.run({ latent_sample: new ort.Tensor('float32', myDen, [1, 4, 64, 64]) });
+                return await myImgPixelsToBlob(myVae.sample.data);
+            }
+        },
         sd15i2i: { label: 'Stable Diffusion 1.5 img2img (ONNX Runtime Web) — not implemented yet', img2img: true, disabled: true }
     };
     let myImgState = null, myImgLoadedEngine = '', myImgHistory = [], myImgIndex = -1, myImgBusy = false, myImgStopFlag = false, myImgOriginalBlob = null;
