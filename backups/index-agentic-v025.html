@@ -2138,10 +2138,8 @@ else if (f.type === 'video') {
               //  const { AutoModelForCausalLM, AutoTokenizer, TextStreamer, StoppingCriteriaList, InterruptableStoppingCriteria } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/+esm');
 
                 const { AutoModelForCausalLM, AutoTokenizer, TextStreamer, StoppingCriteriaList, InterruptableStoppingCriteria } = 
-                    await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');  
-                    
-                 //    await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/+esm');    
-
+                    await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/+esm');    
+                 //  await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');  
 
 
                 myProgressStatus.textContent = `Loading tokenizer (${myRepoId})...`;
@@ -4883,7 +4881,8 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         janus: {
             label: 'Janus-Pro-1B (Transformers.js) — text to image only', img2img: false,
             load: async (myModelId, myProgress) => {
-                const { AutoProcessor, MultiModalityCausalLM } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');
+              //  const { AutoProcessor, MultiModalityCausalLM } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');
+                const { AutoProcessor, MultiModalityCausalLM } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/+esm');
                 const myProcessor = await AutoProcessor.from_pretrained(myModelId, { progress_callback: myProgress });
                 const myModel = await MultiModalityCausalLM.from_pretrained(myModelId, {
                     dtype: { prepare_inputs_embeds: 'q4', language_model: 'q4f16', lm_head: 'fp16', gen_head: 'fp16', gen_img_embeds: 'fp16', image_decode: 'fp32' },
