@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v024</title>
+<title>Ollama Local AI + Agent — v027</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -876,6 +876,66 @@
         </div>
     </div>
 
+</div>
+
+<!-- Image Generation (own engine and model, independent of the text models) -->
+<div class="my-config-panel" id="myImgPanel">
+    <div class="my-collapsible-toggle" onclick="window.myImgToggle()"><span>🖼 Image generation (browser, WebGPU)</span></div>
+    <div class="my-collapsible-body" id="myImgBody">
+        <div class="my-config-row">
+            <div class="my-field my-field-full">
+                <label for="myImgModelInput">Image model — Hugging Face repo ID</label>
+                <input type="text" id="myImgModelInput" value="onnx-community/Janus-Pro-1B-ONNX" oninput="window.myImgSave()" />
+                <select id="myImgModelSelect" onchange="window.myImgPickSuggestion()" aria-label="Suggested image models">
+                    <option value="">Choose a suggested image model...</option>
+                    <option value="onnx-community/Janus-Pro-1B-ONNX" data-engine="janus">Janus-Pro-1B (text-to-image only, ~2.4 GB)</option>
+                    <option value="Zhare-AI/sd-1-5-webgpu" data-engine="sd15i2i">SD 1.5 WebGPU — has a VAE encoder for img2img (engine not implemented yet)</option>
+                </select>
+            </div>
+            <div class="my-field">
+                <label for="myImgEngineSelect">Image engine</label>
+                <select id="myImgEngineSelect" onchange="window.myImgSave(); window.myImgUpdateControls()"></select>
+            </div>
+            <button class="my-btn my-btn-primary" id="myImgLoadBtn" onclick="window.myImgLoad()">⚙ Load image model</button>
+        </div>
+        <div class="my-pull-bar-wrap"><div class="my-pull-bar" id="myImgBar"></div></div>
+        <div id="myImgStatus" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px;">Not loaded.</div>
+        <div class="my-field my-field-full">
+            <label for="myImgPrompt">Prompt</label>
+            <textarea id="myImgPrompt" rows="2" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">A small red robot standing in a green field, digital painting</textarea>
+        </div>
+        <div class="my-config-row" style="margin-top:8px;">
+            <div class="my-field"><label for="myImgMode">Mode</label>
+                <select id="myImgMode" onchange="window.myImgUpdateControls()">
+                    <option value="normal">Normal (text to image)</option>
+                    <option value="persistent">Persistent (previous image in)</option>
+                </select></div>
+            <div class="my-field"><label for="myImgStrength">Change amount: <span id="myImgStrengthLabel">0.50</span> <span id="myImgStrengthHint" style="color:var(--text-muted);"></span></label>
+                <input type="range" id="myImgStrength" min="0.1" max="1" step="0.05" value="0.5" oninput="document.getElementById('myImgStrengthLabel').textContent=parseFloat(this.value).toFixed(2)" /></div>
+            <div class="my-field"><label for="myImgFrames">Frames</label>
+                <input type="number" id="myImgFrames" value="4" min="1" max="200" style="width:80px;" /></div>
+            <div class="my-field"><label for="myImgStartFile">Starting image</label>
+                <input type="file" id="myImgStartFile" accept="image/*" onchange="window.myImgSetStart(this)" /></div>
+            <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);"><input type="checkbox" id="myImgUseLlm" /> Let the text model suggest each next change</label>
+        </div>
+        <div class="my-btn-row">
+            <button class="my-btn my-btn-primary" onclick="window.myImgRun(1)">Generate / Next frame</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgRun(parseInt(document.getElementById('myImgFrames').value,10)||1)">Continuous generate</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgStop()">Stop</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgResetOriginal()">Reset to original</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgShow(myImgIndex-1)">◀ Prev</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgShow(myImgIndex+1)">Next ▶</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgDownload()">Download all</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgDownloadZip()">Download zip</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgClear()">Clear history</button>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div><div class="my-chat-meta">Original</div><img id="myImgOriginal" alt="original" style="max-width:100%;max-height:360px;display:none;border:1px solid var(--border);" /></div>
+            <div><div class="my-chat-meta" id="myImgInfo">No frames yet</div><img id="myImgCurrent" alt="current frame" style="max-width:100%;max-height:360px;display:none;border:1px solid var(--border);" /></div>
+        </div>
+        <div class="my-chat-meta" style="margin-top:10px;">All frames</div>
+        <div id="myImgGallery" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+    </div>
 </div>
 
 <!-- Chat Window -->
@@ -2082,7 +2142,7 @@ else if (f.type === 'video') {
               //  const { AutoModelForCausalLM, AutoTokenizer, TextStreamer, StoppingCriteriaList, InterruptableStoppingCriteria } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/+esm');
 
                 const { AutoModelForCausalLM, AutoTokenizer, TextStreamer, StoppingCriteriaList, InterruptableStoppingCriteria } = 
-                    await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');  
+                    await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/+esm');  
                     
                  //    await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/+esm');    
 
@@ -4819,6 +4879,229 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myChatBox.addEventListener('touchend', myRememberDrag);
     };
     window.myInitView();
+
+    // ── Image generation (v025) — modular engines, own state, independent of the text models ──
+    // Each engine: { label, img2img (true only if the previous image really conditions generation), load(), generate() }.
+    // Only Janus-Pro-1B is implemented (text-to-image). The SD engines are listed but disabled until verified.
+    const myImgEngines = {
+        janus: {
+            label: 'Janus-Pro-1B (Transformers.js) — text to image only', img2img: false,
+            load: async (myModelId, myProgress) => {
+                const { AutoProcessor, MultiModalityCausalLM } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/+esm');
+                const myProcessor = await AutoProcessor.from_pretrained(myModelId, { progress_callback: myProgress });
+                const myModel = await MultiModalityCausalLM.from_pretrained(myModelId, {
+                    dtype: { prepare_inputs_embeds: 'q4', language_model: 'q4f16', lm_head: 'fp16', gen_head: 'fp16', gen_img_embeds: 'fp16', image_decode: 'fp32' },
+                    device: { prepare_inputs_embeds: 'wasm', language_model: 'webgpu', lm_head: 'webgpu', gen_head: 'webgpu', gen_img_embeds: 'webgpu', image_decode: 'webgpu' },
+                    progress_callback: myProgress
+                });
+                return { myProcessor, myModel };
+            },
+            generate: async (myState, myOpts) => {
+                const myInputs = await myState.myProcessor([{ role: '<|User|>', content: myOpts.prompt }], { chat_template: 'text_to_image' });
+                const myN = myState.myProcessor.num_image_tokens;
+                const myOut = await myState.myModel.generate_images({ ...myInputs, min_new_tokens: myN, max_new_tokens: myN, do_sample: true });
+                return await myOut[0].toBlob();
+            }
+        },
+        sdturbo: { label: 'SD-Turbo (ONNX Runtime Web) — not implemented yet', img2img: false, disabled: true },
+        sd15i2i: { label: 'Stable Diffusion 1.5 img2img (ONNX Runtime Web) — not implemented yet', img2img: true, disabled: true }
+    };
+    let myImgState = null, myImgLoadedEngine = '', myImgHistory = [], myImgIndex = -1, myImgBusy = false, myImgStopFlag = false, myImgOriginalBlob = null;
+    const myImgEl = (myId) => document.getElementById(myId);
+    const myImgSetStatus = (myMsg) => { myImgEl('myImgStatus').textContent = myMsg; };
+
+    window.myImgToggle = () => { myImgEl('myImgBody').classList.toggle('open'); };
+    window.myImgSave = () => {
+        try { localStorage.setItem('myImgConfig025', JSON.stringify({ model: myImgEl('myImgModelInput').value, engine: myImgEl('myImgEngineSelect').value })); } catch (e) {}
+    };
+    window.myImgUpdateControls = () => {
+        const myEng = myImgEngines[myImgEl('myImgEngineSelect').value];
+        const myPersistent = myImgEl('myImgMode').value === 'persistent';
+        myImgEl('myImgStrength').disabled = !(myEng && myEng.img2img);
+        myImgEl('myImgStrengthHint').textContent = (myEng && myEng.img2img) ? '' : '(inactive: this engine has no img2img)';
+        if (myPersistent && myEng && !myEng.img2img) myImgSetStatus('This engine cannot use the previous image to generate the next one. Use Normal mode, or an engine marked img2img.');
+    };
+    window.myImgPickSuggestion = () => {
+        const mySel = myImgEl('myImgModelSelect');
+        if (!mySel.value) return;
+        myImgEl('myImgModelInput').value = mySel.value;
+        const myEng = mySel.options[mySel.selectedIndex].dataset.engine;
+        if (myEng) myImgEl('myImgEngineSelect').value = myEng;
+        window.myImgSave(); window.myImgUpdateControls();
+    };
+    window.myImgLoad = async () => {
+        const myKey = myImgEl('myImgEngineSelect').value, myEng = myImgEngines[myKey];
+        const myModelId = myImgEl('myImgModelInput').value.trim();
+        if (!myModelId) { myImgSetStatus('Error: the image model box is empty.'); return; }
+        if (!myEng || myEng.disabled) { myImgSetStatus('Error: this engine is not implemented yet.'); return; }
+        if (!navigator.gpu) { myImgSetStatus('Error: this browser has no WebGPU.'); return; }
+        myImgEl('myImgLoadBtn').disabled = true;
+        try {
+            myImgSetStatus('Loading ' + myModelId + ' ...');
+            myImgState = await myEng.load(myModelId, (myP) => {
+                if (myP && myP.status === 'progress') {
+                    myImgEl('myImgBar').style.width = Math.round(myP.progress || 0) + '%';
+                    myImgSetStatus('Downloading ' + (myP.file || '') + ' ' + Math.round(myP.progress || 0) + '%');
+                }
+            });
+            myImgLoadedEngine = myKey;
+            myImgEl('myImgBar').style.width = '100%';
+            myImgSetStatus('Ready: ' + myEng.label);
+        } catch (myErr) {
+            myImgState = null; myImgLoadedEngine = '';
+            myImgSetStatus('Error loading image model: ' + myErr.message);
+        }
+        myImgEl('myImgLoadBtn').disabled = false;
+    };
+    window.myImgSetStart = (myInput) => {
+        const myFile = myInput.files && myInput.files[0];
+        if (!myFile) return;
+        myImgOriginalBlob = myFile;
+        myImgEl('myImgOriginal').src = URL.createObjectURL(myFile);
+        myImgEl('myImgOriginal').style.display = 'block';
+    };
+    window.myImgShow = (myI) => {
+        if (!myImgHistory.length) return;
+        myImgIndex = Math.max(0, Math.min(myImgHistory.length - 1, myI));
+        const myF = myImgHistory[myImgIndex];
+        myImgEl('myImgCurrent').src = myF.url;
+        myImgEl('myImgCurrent').style.display = 'block';
+        myImgEl('myImgInfo').textContent = 'Frame ' + (myImgIndex + 1) + ' of ' + myImgHistory.length + ' · ' + (myF.ms / 1000).toFixed(1) + ' s';
+    };
+    window.myImgAddCard = (myF, myNum) => {
+        const myCard = document.createElement('div');
+        myCard.style.cssText = 'width:220px;border:1px solid var(--border);padding:6px;font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);';
+        const myPic = document.createElement('img');
+        myPic.src = myF.url; myPic.style.cssText = 'width:100%;cursor:pointer;';
+        myPic.onclick = () => window.myImgShow(myNum - 1);
+        const myCap = document.createElement('div');
+        myCap.textContent = 'Frame ' + myNum + ' · ' + (myF.ms / 1000).toFixed(1) + ' s · ' + myF.prompt;
+        myCard.appendChild(myPic); myCard.appendChild(myCap);
+        myImgEl('myImgGallery').appendChild(myCard);
+    };
+    window.myImgRun = async (myCount) => {
+        if (myImgBusy) return;
+        const myKey = myImgEl('myImgEngineSelect').value, myEng = myImgEngines[myKey];
+        if (!myImgState || myImgLoadedEngine !== myKey) { myImgSetStatus('Load the image model first.'); return; }
+        const myPersistent = myImgEl('myImgMode').value === 'persistent';
+        if (myPersistent && !myEng.img2img) { window.myImgUpdateControls(); return; }
+        myImgBusy = true; myImgStopFlag = false;
+        try {
+            for (let myN = 0; myN < myCount && !myImgStopFlag; myN++) {
+                let myPrompt = myImgEl('myImgPrompt').value.trim();
+                if (myImgEl('myImgUseLlm').checked && myImgHistory.length) {
+                    try {
+                        myImgSetStatus('Asking the text model for the next change ...');
+                        const myIdea = await myAgentAskModel('The last image prompt was: "' + myPrompt + '". Reply with the new prompt only: the same scene with one small visual change.');
+                        if (myIdea && myIdea.trim()) { myPrompt = myIdea.trim().split('\n')[0]; myImgEl('myImgPrompt').value = myPrompt; }
+                    } catch (myErr) { myImgSetStatus('Text model unavailable, reusing the prompt: ' + myErr.message); }
+                }
+                const myStart = performance.now();
+                myImgSetStatus('Generating frame ' + (myImgHistory.length + 1) + ' ...');
+                const myPrev = myImgHistory.length ? myImgHistory[myImgHistory.length - 1].blob : myImgOriginalBlob;
+                const myFrameNum = myImgHistory.length + 1;
+                const myTick = setInterval(() => {
+                    const myMsg = 'Generating frame ' + myFrameNum + ' ... ⏱ ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s';
+                    myImgSetStatus(myMsg); myImgEl('myImgInfo').textContent = myMsg;
+                }, 100);
+                let myBlob;
+                try {
+                    myBlob = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value) });
+                } finally { clearInterval(myTick); }
+                myImgHistory.push({ blob: myBlob, url: URL.createObjectURL(myBlob), ms: performance.now() - myStart, prompt: myPrompt });
+                window.myImgAddCard(myImgHistory[myImgHistory.length - 1], myImgHistory.length);
+                window.myImgShow(myImgHistory.length - 1);
+            }
+            myImgSetStatus(myImgStopFlag ? 'Stopped.' : 'Done.');
+        } catch (myErr) {
+            myImgSetStatus('Generation error: ' + myErr.message);
+        }
+        myImgBusy = false;
+    };
+    window.myImgStop = () => { myImgStopFlag = true; };
+    window.myImgResetOriginal = () => {
+        if (!myImgOriginalBlob) { myImgSetStatus('No starting image set.'); return; }
+        myImgHistory.push({ blob: myImgOriginalBlob, url: URL.createObjectURL(myImgOriginalBlob), ms: 0, prompt: '(original)' });
+        window.myImgAddCard(myImgHistory[myImgHistory.length - 1], myImgHistory.length);
+        window.myImgShow(myImgHistory.length - 1);
+    };
+    window.myImgDownload = async () => {
+        if (!myImgHistory.length) return;
+        for (let myI = 0; myI < myImgHistory.length; myI++) {
+            const myA = document.createElement('a');
+            myA.href = myImgHistory[myI].url; myA.download = 'frame-' + String(myI + 1).padStart(3, '0') + '.png';
+            document.body.appendChild(myA); myA.click(); myA.remove();
+            await new Promise((myR) => setTimeout(myR, 300));
+        }
+    };
+    const myCrcTable = (() => {
+        const myT = [];
+        for (let myN = 0; myN < 256; myN++) { let myC = myN; for (let myK = 0; myK < 8; myK++) myC = (myC & 1) ? (0xEDB88320 ^ (myC >>> 1)) : (myC >>> 1); myT[myN] = myC >>> 0; }
+        return myT;
+    })();
+    const myCrc32 = (myBytes) => {
+        let myC = 0xFFFFFFFF;
+        for (let myI = 0; myI < myBytes.length; myI++) myC = myCrcTable[(myC ^ myBytes[myI]) & 255] ^ (myC >>> 8);
+        return (myC ^ 0xFFFFFFFF) >>> 0;
+    };
+    // Store-only ZIP (PNG files are already compressed), no library needed.
+    window.myImgDownloadZip = async () => {
+        if (!myImgHistory.length) return;
+        const myEnc = new TextEncoder();
+        const myFiles = [];
+        let myInfo = 'frame, seconds, prompt\n';
+        for (let myI = 0; myI < myImgHistory.length; myI++) {
+            const myF = myImgHistory[myI];
+            myFiles.push({ name: 'frame-' + String(myI + 1).padStart(3, '0') + '.png', data: new Uint8Array(await myF.blob.arrayBuffer()) });
+            myInfo += (myI + 1) + ', ' + (myF.ms / 1000).toFixed(1) + ', ' + myF.prompt.replace(/\n/g, ' ') + '\n';
+        }
+        myFiles.push({ name: 'frames-info.txt', data: myEnc.encode(myInfo) });
+        const myParts = [], myCentral = [];
+        let myOffset = 0;
+        for (const myFile of myFiles) {
+            const myName = myEnc.encode(myFile.name), myCrc = myCrc32(myFile.data), myLen = myFile.data.length;
+            const myLh = new DataView(new ArrayBuffer(30));
+            myLh.setUint32(0, 0x04034b50, true); myLh.setUint16(4, 20, true); myLh.setUint16(12, 0x21, true);
+            myLh.setUint32(14, myCrc, true); myLh.setUint32(18, myLen, true); myLh.setUint32(22, myLen, true); myLh.setUint16(26, myName.length, true);
+            myParts.push(myLh.buffer, myName, myFile.data);
+            const myCh = new DataView(new ArrayBuffer(46));
+            myCh.setUint32(0, 0x02014b50, true); myCh.setUint16(4, 20, true); myCh.setUint16(6, 20, true); myCh.setUint16(14, 0x21, true);
+            myCh.setUint32(16, myCrc, true); myCh.setUint32(20, myLen, true); myCh.setUint32(24, myLen, true);
+            myCh.setUint16(28, myName.length, true); myCh.setUint32(42, myOffset, true);
+            myCentral.push(myCh.buffer, myName);
+            myOffset += 30 + myName.length + myLen;
+        }
+        const myCentralSize = myCentral.reduce((myS, myP) => myS + (myP.byteLength !== undefined ? myP.byteLength : myP.length), 0);
+        const myEnd = new DataView(new ArrayBuffer(22));
+        myEnd.setUint32(0, 0x06054b50, true); myEnd.setUint16(8, myFiles.length, true); myEnd.setUint16(10, myFiles.length, true);
+        myEnd.setUint32(12, myCentralSize, true); myEnd.setUint32(16, myOffset, true);
+        const myUrl = URL.createObjectURL(new Blob([...myParts, ...myCentral, myEnd.buffer], { type: 'application/zip' }));
+        const myA = document.createElement('a');
+        myA.href = myUrl; myA.download = 'image-frames.zip';
+        document.body.appendChild(myA); myA.click(); myA.remove();
+        setTimeout(() => URL.revokeObjectURL(myUrl), 5000);
+    };
+    window.myImgClear = () => {
+        myImgHistory.forEach((myF) => URL.revokeObjectURL(myF.url));
+        myImgHistory = []; myImgIndex = -1;
+        myImgEl('myImgCurrent').style.display = 'none';
+        myImgEl('myImgInfo').textContent = 'No frames yet';
+        myImgEl('myImgGallery').innerHTML = '';
+    };
+    (() => {
+        const mySelEl = myImgEl('myImgEngineSelect');
+        Object.keys(myImgEngines).forEach((myK) => {
+            const myO = document.createElement('option');
+            myO.value = myK; myO.textContent = myImgEngines[myK].label; myO.disabled = !!myImgEngines[myK].disabled;
+            mySelEl.appendChild(myO);
+        });
+        try {
+            const mySaved = JSON.parse(localStorage.getItem('myImgConfig025') || '{}');
+            if (typeof mySaved.model === 'string') myImgEl('myImgModelInput').value = mySaved.model;
+            if (mySaved.engine && myImgEngines[mySaved.engine]) mySelEl.value = mySaved.engine;
+        } catch (e) {}
+        window.myImgUpdateControls();
+    })();
 
     myLoadConfig(); // also restores backend choice and pings the right status check
     window.myUpdatePipelineModeUI();
