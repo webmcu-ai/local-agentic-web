@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU SD-Turbo Runner</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js"></script>
+    <style>
+        :root {
+            --bg-base:#0d1117; --bg-panel:#161b22; --bg-input:#1c2128; --border:#30363d;
+            --border-focus:#58a6ff; --text-primary:#e6edf3; --text-secondary:#8b949e; --text-muted:#484f58;
+            --accent-blue:#58a6ff; --accent-red:#f85149;
+            --font-mono:'SF Mono','Fira Code','Consolas',monospace;
+            --font-ui:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+            --radius:6px; --radius-lg:10px; --my-page-width:900px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-ui); background: var(--bg-base); color: var(--text-primary);
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+            padding: 24px 16px; gap: 16px;
+        }
+        .my-header {
+            width: 100%; max-width: var(--my-page-width); display: flex; align-items: center;
+            justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+        }
+        .my-header h1 { font-size: 1.1rem; font-weight: 600; font-family: var(--font-mono); }
+        .my-config-panel {
+            width: 100%; max-width: var(--my-page-width); background: var(--bg-panel);
+            border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px;
+            display: flex; flex-direction: column; gap: 14px;
+        }
+        .my-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .my-field label {
+            font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.06em;
+        }
+        .my-field input[type="text"], textarea {
+            background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius);
+            color: var(--text-primary); font-family: var(--font-mono); font-size: 0.85rem;
+            padding: 9px 12px; outline: none;
+        }
+        .my-field input:focus, textarea:focus { border-color: var(--border-focus); }
+        .my-btn {
+            padding: 8px 16px; border-radius: var(--radius); border: 1px solid transparent;
+            font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; cursor: pointer;
+        }
+        .my-btn-primary { background: var(--accent-blue); color: #000; }
+        .my-btn-secondary { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+        .my-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .my-progress-wrap { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+        .my-progress-bar { height: 100%; background: var(--accent-blue); width: 0%; transition: width 0.2s; }
+        .my-status-text { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); }
+        .my-output-stage {
+            display: flex; justify-content: center; align-items: center; min-height: 256px;
+            border: 1px dashed var(--border); border-radius: var(--radius); overflow: hidden;
+        }
+        .my-output-stage canvas { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+
+<div class="my-header">
+    <h1>WebGPU SD-Turbo Runner</h1>
+    <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary);">1-step text-to-image</span>
+</div>
+
+<div class="my-config-panel">
+    <div class="my-field">
+        <label for="myRepoInput">Hugging Face Repository</label>
+        <input type="text" id="myRepoInput" value="schmuell/sd-turbo-ort-web" readonly />
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <button class="my-btn my-btn-secondary" id="myLoadBtn" onclick="myLoadSdModel()">⚙ Load Models (~2.4GB, cached after first time)</button>
+    </div>
+
+    <div class="my-progress-wrap"><div class="my-progress-bar" id="myProgressBar"></div></div>
+    <div class="my-status-text" id="myStatusText">Status: Idle</div>
+
+    <div class="my-field" style="margin-top: 10px;">
+        <label for="myPromptInput">Prompt</label>
+        <textarea id="myPromptInput" rows="3">A high quality digital painting of a robot in a field of flowers, 8k resolution</textarea>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <button class="my-btn my-btn-primary" id="myRunBtn" onclick="myGenerateImage()" disabled>🖼 Run Text-To-Image</button>
+    </div>
+
+    <div class="my-output-stage" id="myStage">
+        <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">No image generated yet</span>
+    </div>
+</div>
+
+<script type="module">
+    import { AutoTokenizer } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+    const myRepoBase = "https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main";
+
+    const myModelList = {
+        textEncoder: {
+            url: myRepoBase + "/text_encoder/model.onnx", mb: 1700,
+            opt: { freeDimensionOverrides: { batch_size: 1 } }
+        },
+        unet: {
+            url: myRepoBase + "/unet/model.onnx", mb: 640,
+            opt: { freeDimensionOverrides: { batch_size: 1, num_channels: 4, height: 64, width: 64, sequence_length: 77 } }
+        },
+        vaeDecoder: {
+            url: myRepoBase + "/vae_decoder/model.onnx", mb: 95,
+            opt: { freeDimensionOverrides: { batch_size: 1, num_channels_latent: 4, height_latent: 64, width_latent: 64 } }
+        }
+    };
+
+    let myTokenizer = null;
+    let mySessions = {};
+    let myIsLoaded = false;
+
+    function myUpdateStatus(text, pct) {
+        document.getElementById('myStatusText').textContent = 'Status: ' + text;
+        if (pct !== undefined) document.getElementById('myProgressBar').style.width = pct + '%';
+    }
+
+    async function myFetchModel(myUrl, myLabel, myBasePct, mySpanPct, myApproxMb) {
+        let myCache = null;
+        try { myCache = await caches.open('my-sd-turbo-cache'); } catch (e) {}
+
+        let myResp = myCache ? await myCache.match(myUrl) : null;
+        if (myResp) {
+            myUpdateStatus(myLabel + ' (from cache)', myBasePct + mySpanPct);
+            return await myResp.arrayBuffer();
+        }
+
+        myResp = await fetch(myUrl);
+        if (!myResp.ok) throw new Error(myLabel + ' download failed: HTTP ' + myResp.status);
+
+        const myTotal = parseInt(myResp.headers.get('Content-Length')) || myApproxMb * 1e6;
+        const myReader = myResp.body.getReader();
+        const myChunks = [];
+        let myLoaded = 0;
+
+        while (true) {
+            const { done, value } = await myReader.read();
+            if (done) break;
+            myChunks.push(value);
+            myLoaded += value.length;
+            const myFrac = Math.min(myLoaded / myTotal, 1);
+            myUpdateStatus('Downloading ' + myLabel + ' ' + (myLoaded / 1e6).toFixed(0) + ' MB', myBasePct + mySpanPct * myFrac);
+        }
+
+        const myBuffer = new Uint8Array(myLoaded);
+        let myOffset = 0;
+        for (const myChunk of myChunks) { myBuffer.set(myChunk, myOffset); myOffset += myChunk.length; }
+
+        if (myCache) {
+            try { await myCache.put(myUrl, new Response(myBuffer)); } catch (e) { console.warn('Cache put failed', e); }
+        }
+        return myBuffer.buffer;
+    }
+
+    window.myLoadSdModel = async function () {
+        if (!navigator.gpu) {
+            alert("WebGPU is not enabled or supported on this browser.");
+            return;
+        }
+        const myLoadBtn = document.getElementById('myLoadBtn');
+        myLoadBtn.disabled = true;
+
+        try {
+            myUpdateStatus('Loading CLIP tokenizer...', 2);
+            myTokenizer = await AutoTokenizer.from_pretrained('Xenova/clip-vit-base-patch16');
+
+            ort.env.wasm.numThreads = 1;
+
+            const myPlan = [
+                ['textEncoder', 'text encoder', 5, 55],
+                ['unet', 'UNet', 60, 20],
+                ['vaeDecoder', 'VAE decoder', 80, 10]
+            ];
+
+            for (const [myKey, myLabel, myBase, mySpan] of myPlan) {
+                const myModel = myModelList[myKey];
+                const myBytes = await myFetchModel(myModel.url, myLabel, myBase, mySpan, myModel.mb);
+                myUpdateStatus('Creating ' + myLabel + ' WebGPU session...', myBase + mySpan);
+                mySessions[myKey] = await ort.InferenceSession.create(myBytes, {
+                    executionProviders: ['webgpu'],
+                    enableMemPattern: false,
+                    enableCpuMemArena: false,
+                    ...myModel.opt
+                });
+            }
+
+            myIsLoaded = true;
+            document.getElementById('myRunBtn').disabled = false;
+            myUpdateStatus('Ready. All models loaded via WebGPU.', 100);
+        } catch (err) {
+            console.error(err);
+            myUpdateStatus('Load failed: ' + err.message, 0);
+            myLoadBtn.disabled = false;
+        }
+    };
+
+    function myRandn(myCount) {
+        const myOut = new Float32Array(myCount);
+        for (let i = 0; i < myCount; i += 2) {
+            const u1 = Math.random() || 1e-12, u2 = Math.random();
+            const r = Math.sqrt(-2 * Math.log(u1));
+            myOut[i] = r * Math.cos(2 * Math.PI * u2);
+            if (i + 1 < myCount) myOut[i + 1] = r * Math.sin(2 * Math.PI * u2);
+        }
+        return myOut;
+    }
+
+    function myDrawImage(myData) {
+        const mySize = 512, myPlane = mySize * mySize;
+        const myCanvas = document.createElement('canvas');
+        myCanvas.width = mySize;
+        myCanvas.height = mySize;
+        const myCtx = myCanvas.getContext('2d');
+        const myImg = myCtx.createImageData(mySize, mySize);
+        const myClamp = v => Math.max(0, Math.min(255, Math.round((v / 2 + 0.5) * 255)));
+        for (let i = 0; i < myPlane; i++) {
+            myImg.data[i * 4]     = myClamp(myData[i]);
+            myImg.data[i * 4 + 1] = myClamp(myData[myPlane + i]);
+            myImg.data[i * 4 + 2] = myClamp(myData[2 * myPlane + i]);
+            myImg.data[i * 4 + 3] = 255;
+        }
+        myCtx.putImageData(myImg, 0, 0);
+        const myStage = document.getElementById('myStage');
+        myStage.innerHTML = '';
+        myStage.appendChild(myCanvas);
+    }
+
+    window.myGenerateImage = async function () {
+        if (!myIsLoaded) return;
+        const myRunBtn = document.getElementById('myRunBtn');
+        const myPrompt = document.getElementById('myPromptInput').value.trim();
+        myRunBtn.disabled = true;
+
+        try {
+            const myStart = performance.now();
+
+            myUpdateStatus('Encoding prompt...', 20);
+            const myTok = await myTokenizer(myPrompt, { padding: 'max_length', max_length: 77, truncation: true, return_tensor: false });
+            const myIds = Int32Array.from(myTok.input_ids);
+            const myEnc = await mySessions.textEncoder.run({
+                input_ids: new ort.Tensor('int32', myIds, [1, myIds.length])
+            });
+            const myHidden = myEnc.last_hidden_state;
+
+            myUpdateStatus('Running UNet (1 step)...', 50);
+            const mySigma = 14.6146;
+            const myLatents = myRandn(4 * 64 * 64);
+            for (let i = 0; i < myLatents.length; i++) myLatents[i] *= mySigma;
+
+            const myScale = 1 / Math.sqrt(mySigma * mySigma + 1);
+            const myUnetIn = myLatents.map(v => v * myScale);
+
+            const myUnetOut = await mySessions.unet.run({
+                sample: new ort.Tensor('float32', myUnetIn, [1, 4, 64, 64]),
+                timestep: new ort.Tensor('int64', BigInt64Array.from([999n]), [1]),
+                encoder_hidden_states: myHidden
+            });
+            const myNoise = myUnetOut.out_sample.data;
+
+            const myDenoised = new Float32Array(myLatents.length);
+            for (let i = 0; i < myDenoised.length; i++) {
+                myDenoised[i] = (myLatents[i] - mySigma * myNoise[i]) / 0.18215;
+            }
+
+            myUpdateStatus('Decoding image...', 80);
+            const myVae = await mySessions.vaeDecoder.run({
+                latent_sample: new ort.Tensor('float32', myDenoised, [1, 4, 64, 64])
+            });
+
+            myDrawImage(myVae.sample.data);
+            myUpdateStatus('Done in ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s', 100);
+        } catch (err) {
+            console.error(err);
+            myUpdateStatus('Inference error: ' + err.message, 0);
+        } finally {
+            myRunBtn.disabled = false;
+        }
+    };
+</script>
+
+</body>
+</html>
