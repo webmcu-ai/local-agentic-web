@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v030</title>
+<title>Ollama Local AI + Agent — v033</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -83,7 +83,7 @@
 
         /* ── Header ── */
         .my-header {
-            width: 100%; max-width: var(--my-page-width);
+            width: 100%; max-width: none;
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px 0 8px;
             border-bottom: 1px solid var(--border);
@@ -136,7 +136,7 @@
 
         /* ── Setup Panel ── */
         .my-setup-panel {
-            width: 100%; max-width: var(--my-page-width);
+            width: 100%; max-width: none;
             background: var(--bg-panel);
             border: 1px solid var(--accent-orange);
             border-radius: var(--radius-lg); overflow: hidden;
@@ -183,7 +183,7 @@
 
         /* ── Config Panel ── */
         .my-config-panel {
-            width: 100%; max-width: var(--my-page-width);
+            width: 100%; max-width: none;
             background: var(--bg-panel); border: 1px solid var(--border);
             border-radius: var(--radius-lg); padding: 14px 16px;
             display: flex; flex-direction: column; gap: 12px;
@@ -212,7 +212,7 @@
         #myAgLog, #myFileListContainer { resize: vertical; overflow: auto; max-height: none !important; min-height: 80px; }
         #myAgSerialIn { resize: vertical; min-height: 60px; }
         .my-view-bar {
-            width: 100%; max-width: var(--my-page-width);
+            width: 100%; max-width: none;
             background: var(--bg-panel); border: 1px solid var(--border);
             border-radius: var(--radius-lg); padding: 10px 14px;
             display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
@@ -259,6 +259,18 @@
         .my-pull-bar { height: 100%; background: var(--accent-blue); border-radius: 2px; width: 0%; transition: width 0.2s; }
         .my-pull-status { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); }
 
+
+        /* ── Help sections (collapsed by default) ── */
+        .my-help { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-base); margin: 6px 0 10px; }
+        .my-help > summary { cursor: pointer; padding: 7px 10px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-blue); user-select: none; }
+        .my-help > summary:hover { color: var(--text-primary); }
+        .my-help-body { padding: 2px 12px 10px; font-size: 0.75rem; line-height: 1.6; color: var(--text-secondary); }
+        .my-help-body h4 { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--text-primary); margin: 10px 0 3px; }
+        .my-help-body ul, .my-help-body ol { padding-left: 18px; }
+        .my-help-body code { font-family: var(--font-mono); color: var(--accent-green); }
+        .my-help-ex { display: block; font-family: var(--font-mono); color: var(--accent-green); background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; margin: 3px 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+        .my-help-note { font-size: 0.7rem; color: var(--text-muted); }
+
         /* ── Collapsible sections ── */
         .my-collapsible-toggle {
             display: flex; align-items: center; gap: 6px;
@@ -280,7 +292,7 @@
 
         /* ── Chat ── */
         .my-chat-wrap {
-            width: 100%; max-width: var(--my-page-width);
+            width: 100%; max-width: none;
             background: var(--bg-panel); border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             display: flex; flex-direction: column;
@@ -424,7 +436,7 @@
 
         /* ── Tools Panel ── */
         .my-tools-panel {
-            width: 100%; max-width: var(--my-page-width);
+            width: 100%; max-width: none;
             background: var(--bg-panel); border: 1px solid var(--border);
             border-radius: var(--radius-lg); overflow: hidden;
         }
@@ -600,8 +612,8 @@
 <!-- View controls (page width, text size, chat height) -->
 <div class="my-view-bar my-panel-hidden" id="myViewBar">
     <div class="my-field">
-        <label for="myViewWidthSelect">Page width</label>
-        <select id="myViewWidthSelect" onchange="window.myHandleViewChange()">
+        <label for="myViewWidthSelect">Page width (always full window now)</label>
+        <select id="myViewWidthSelect" onchange="window.myHandleViewChange()" disabled title="The page now fills the window width">
             <option value="860px">Narrow (860 px)</option>
             <option value="1100px">Normal (1100 px)</option>
             <option value="1400px">Wide (1400 px)</option>
@@ -882,6 +894,31 @@
 <div class="my-config-panel" id="myImgPanel">
     <div class="my-collapsible-toggle" onclick="window.myImgToggle()"><span>🖼 Image generation (browser, WebGPU)</span></div>
     <div class="my-collapsible-body" id="myImgBody">
+        <details class="my-help"><summary>ℹ Help: how image generation works</summary>
+            <div class="my-help-body">
+                <h4>Workflow</h4>
+                <ol>
+                    <li>Pick an image model and engine, then click <b>Load image model</b>. Image models load separately from the text model above.</li>
+                    <li>Write the <b>Image prompt</b>: what should appear in the picture.</li>
+                    <li>Choose <b>Normal</b> or <b>Persistent</b> mode.</li>
+                    <li>Persistent only: give it a picture to start from (<b>Starting image</b>, an earlier frame, or click a frame and press <b>Active to original</b>).</li>
+                    <li><b>Generate / Next frame</b> makes one image. <b>Continuous generate</b> makes <b>Frames</b> images in a row (1 to 200).</li>
+                </ol>
+                <h4>Controls</h4>
+                <ul>
+                    <li><b>Normal</b>: a new image from the text alone. <b>Persistent</b>: the newest frame is the starting point for the next one, so a sequence changes gradually.</li>
+                    <li><b>Change amount</b>: how far the next image may move away from the previous one. Low = small steps, high = big changes. Only used by engines that support image-to-image.</li>
+                    <li><b>Let the text model suggest each next change</b>: once a frame or starting image exists, the text model reads the last prompt plus the <b>Instructions</b> box and rewrites the Image prompt box. The Instructions box is permanent: it is never edited and never becomes part of the image prompt.</li>
+                    <li><b>Active to original</b> sets the frame you clicked as the original and makes the next Persistent frame start from it. <b>Reset to original</b> adds the original again as the newest frame.</li>
+                    <li>Frames can be dragged to reorder (or use ◀ ▶), deleted with ✕, and turned into a video with <b>Make MP4</b> in gallery order.</li>
+                </ul>
+                <h4>Model differences</h4>
+                <ul>
+                    <li><b>Janus-Pro</b>: reads the whole prompt, text-to-image only (no Persistent mode).</li>
+                    <li><b>SD-Turbo</b>: reads only the first ~75 tokens (about 55 words), supports Persistent. Put the part that changes at the start of the prompt.</li>
+                </ul>
+            </div>
+        </details>
         <div class="my-config-row">
             <div class="my-field my-field-full">
                 <label for="myImgModelInput">Image model — Hugging Face repo ID</label>
@@ -931,6 +968,7 @@ Write the changed action in the first sentence, because the image model only rea
             <button class="my-btn my-btn-secondary" onclick="window.myImgRun(parseInt(document.getElementById('myImgFrames').value,10)||1)">Continuous generate</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgStop()">Stop</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgResetOriginal()">Reset to original</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgActiveToOriginal()" title="Make the frame you clicked on the original that the next Persistent frame starts from">Active to original</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgShow(myImgIndex-1)">◀ Prev</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgShow(myImgIndex+1)">Next ▶</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgDownload()">Download all</button>
@@ -1037,6 +1075,20 @@ Write the changed action in the first sentence, because the image model only rea
     </div>
     <div class="my-tools-body" id="myToolsBody">
 
+        <details class="my-help"><summary>ℹ Help: what the Output Tools do</summary>
+            <div class="my-help-body">
+                <p>Every tool here works on the <b>latest AI response</b> in the chat, not on earlier messages.</p>
+                <h4>Send to another AI</h4>
+                <p>Copies the latest response (or only the text you have selected) to the clipboard and opens the chosen chat site in a new tab. Paste it there. The URL box accepts any custom address.</p>
+                <h4>HTML Extractor</h4>
+                <p><b>Extract HTML</b> pulls the HTML code out of the latest response into the box. <b>Render in New Tab</b> shows it as a web page. <b>Copy Code</b> copies the box. You can edit the box before rendering.</p>
+                <h4>Math Renderer</h4>
+                <p><b>Render Math</b> displays the latest response with MathJax, so equations the AI wrote as LaTeX appear as formatted math.</p>
+                <h4>Image / SVG</h4>
+                <p><b>Extract Image / SVG</b> looks in the latest response for an inline <code>&lt;svg&gt;</code> drawing or an <code>&lt;img src="data:image/..."&gt;</code> (base64) picture and displays it.</p>
+            </div>
+        </details>
+
         <!-- Send to other LLM -->
         <div>
             <div class="my-section-label">Send last response to another AI (copies text, opens tab)</div>
@@ -1106,6 +1158,44 @@ Write the changed action in the first sentence, because the image model only rea
     <div class="my-tools-body" id="myAgentPanelBody">
 
         <div>
+            <details class="my-help"><summary>ℹ Help: keyword reference (variables, markers, modes)</summary>
+                <div class="my-help-body">
+                    <p>Only the <code>${...}</code> variables and the <code>=== FILE: name ===</code> marker are real syntax. Words like READ or IMPROVE in a prompt are ordinary English the model interprets. Variables are filled in when the folder agent runs Classic mode; Create and Improve use their own built-in prompts. More detail is in the Help below.</p>
+                    <h4>File variables (use in the base prompt)</h4>
+                    <ul>
+                        <li><code>${input}</code> content of the current input file</li>
+                        <li><code>${filename}</code> name of the current file</li>
+                        <li><code>${iteration}</code> current pass number (1, 2, 3 ...)</li>
+                        <li><code>${original}</code> the input as it was before auto-chain started overwriting it</li>
+                        <li><code>${manifest}</code> list of files already created for this job</li>
+                        <li><code>${sensor1}</code> example: any other <code>${name}</code> inserts the contents of <code>name.in.txt</code> (or <code>name.txt</code>) from the folder; missing files give empty text</li>
+                    </ul>
+                    <h4>Copyable examples</h4>
+                    <div>READ</div><span class="my-help-ex">Read and summarize ${input}.</span>
+                    <div>PRESERVE</div><span class="my-help-ex">Keep the original requirements in ${original}.</span>
+                    <div>ITERATE</div><span class="my-help-ex">Improve the current result using ${iteration} to track the current pass.</span>
+                    <div>ADD FILES</div><span class="my-help-ex">Check ${manifest} before creating files. Do not recreate files that already exist. Add one useful new file.</span>
+                    <div>MULTIPLE INPUTS</div><span class="my-help-ex">Compare ${sensor1} with ${sensor2} and explain the differences.</span>
+                    <h4>Multi-file output marker</h4>
+                    <span class="my-help-ex">=== FILE: index.html ===
+...
+=== FILE: script.js ===
+...
+=== FILE: README.md ===
+...</span>
+                    <p>Each marker line starts a separate file. The <b>Multi-file output</b> checkbox only turns on the parsing: your prompt must still tell the model to answer in this format.</p>
+                    <h4>Operating modes</h4>
+                    <ul>
+                        <li><b>Classic</b>: runs your base prompt on each input.</li>
+                        <li><b>Create</b>: plans, generates, reviews and corrects a new project from the input text.</li>
+                        <li><b>Improve</b>: inspects existing files, audits, ranks improvements, implements and verifies them (works on a copy; originals are kept).</li>
+                    </ul>
+                    <h4>Auto-chain</h4>
+                    <p>Repeats the job up to <b>Max auto-chain iterations</b>. Classic single-file: the output replaces the input for the next pass. Classic multi-file: the input is left alone and progress is tracked with <code>${manifest}</code> and <code>${iteration}</code>. Create: later passes switch to Improve on the new project. Improve: repeats the cycle and stops early when nothing worthwhile is left.</p>
+                    <p class="my-help-note">The Agent folder and the Coding Agent's coding folder are separate choices. Use different folders so their files do not mix.</p>
+                </div>
+            </details>
+
             <details style="margin-bottom: 12px;">
                 <summary style="cursor:pointer; font-size:0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">Help: how this panel works, multi-file output, file variables</summary>
                 <div style="margin-top: 8px;">
@@ -1288,6 +1378,42 @@ console.log("hi");</pre>
         <span class="my-setup-toggle" id="myAgPanelLabel">▼ show</span>
     </div>
     <div class="my-tools-body" id="myAgPanelBody">
+        <details class="my-help"><summary>ℹ Help: how the coding agent works + keyword reference</summary>
+            <div class="my-help-body">
+                <h4>Getting started</h4>
+                <ul>
+                    <li><b>Select / Create Coding Folder</b> gives the agent permission to read that folder. It can only see files inside it.</li>
+                    <li>The agent runs on the backend chosen at the top (Ollama or WebGPU), and the selected model does the work.</li>
+                    <li>It inspects files before suggesting anything. Its changes are proposals you can review and approve; an independent review runs first and the Approval setting decides what waits for you (deleting a file always does).</li>
+                    <li>It <b>cannot</b> compile, upload firmware or run the code.</li>
+                    <li>Web Serial needs Chrome or Edge on https or localhost.</li>
+                    <li>The coding folder and the Agentic Folder Automation folder are separate choices. Use different folders so their files do not mix.</li>
+                </ul>
+                <h4>Agent tools (the agent calls these itself)</h4>
+                <p>These are the agent's real tools. You do not type them: describe the job in plain English and the agent picks the tools.</p>
+                <ul>
+                    <li><code>list_files</code> see what files are available</li>
+                    <li><code>read_file</code> read a file (6000 characters per call, it continues for long files)</li>
+                    <li><code>search_files</code> find text across files (case-insensitive, first 30 matching lines)</li>
+                    <li><code>record_audit</code> record findings, with exact evidence from the code, before changing anything</li>
+                    <li><code>propose_file_edit</code> suggest a targeted change to a file it has read</li>
+                    <li><code>propose_file_write</code> suggest a new file or a full rewrite of one</li>
+                    <li><code>propose_file_delete</code> propose deleting a file it has read; always waits for your decision</li>
+                </ul>
+                <p>It also has <code>get_workspace_summary</code>, <code>inspect_esp32_pin_map</code> and <code>get_serial_status</code> for the board profile and serial connection.</p>
+                <p><b>Workflow rule:</b> inspect (list and read), then record an audit, then propose changes, then an independent review. Proposals are refused until an audit is recorded, and changes to an existing file are refused until the agent has read it.</p>
+                <h4>Prompt wording that encourages each tool (ordinary English, not commands)</h4>
+                <div>READ</div><span class="my-help-ex">READ index.html and inspect the JavaScript functions that control the camera.</span>
+                <div>SEARCH</div><span class="my-help-ex">SEARCH the coding folder for every reference to WebSerial.</span>
+                <div>AUDIT</div><span class="my-help-ex">AUDIT the project for memory leaks and unnecessary TensorFlow.js tensor allocations.</span>
+                <div>EDIT</div><span class="my-help-ex">EDIT only the camera initialization function. Do not rewrite the rest of the file.</span>
+                <div>CREATE</div><span class="my-help-ex">CREATE a new test.html file that demonstrates the camera functionality.</span>
+                <div>REVIEW</div><span class="my-help-ex">REVIEW your proposed changes for errors before finishing.</span>
+                <h4>Example requests</h4>
+                <div>Inspect only</div><span class="my-help-ex">READ the entire project. Identify the five most important improvements, but do not change any files.</span>
+                <div>Make improvements</div><span class="my-help-ex">Inspect the project, audit the JavaScript for errors, prioritize the three most important issues, propose targeted edits and independently review the changes.</span>
+            </div>
+        </details>
         <div style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">Uses the backend chosen at the top (Ollama or WebGPU) and the model set above. Writes are only proposals you approve. The agent cannot compile, flash or run code. Serial needs Chrome/Edge on https or localhost.</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="myPickCodeFolder()">Select / Create Coding Folder</button>
@@ -4900,7 +5026,8 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
     // ── SD-Turbo engine helpers (same ONNX Runtime Web approach as image-only-v004.html) ──
     // The VAE encoder (needed to feed the previous frame back in) comes from the SD 1.5 WebGPU repo:
     // SD 1.5 and SD-Turbo (SD 2.1 based) share the same VAE encoder weights.
-    const MY_SD_VAE_ENCODER_URL = 'https://huggingface.co/Zhare-AI/sd-1-5-webgpu/resolve/main/onnx/vae_encoder.onnx';
+    // The matching encoder (converted from stabilityai/sd-turbo, same author as the UNet and decoder). Used if the chosen model repo has no vae_encoder folder.
+    const MY_SD_VAE_ENCODER_URL = 'https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main/vae_encoder/model.onnx';
     const myImgLoadScript = (myUrl) => new Promise((myOk, myFail) => {
         const myS = document.createElement('script');
         myS.src = myUrl; myS.onload = myOk; myS.onerror = () => myFail(new Error('Could not load ' + myUrl));
@@ -4908,7 +5035,8 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
     });
     const myImgFetchModel = async (myUrl, myLabel, myBasePct, mySpanPct, myApproxMb, myProgress) => {
         let myCache = null;
-        try { myCache = await caches.open('my-sd-turbo-cache'); } catch (e) {}
+        try { myCache = await caches.open('my-sd-turbo-cache'); }
+        catch (e) { console.warn('Browser cache not available on this page, models will download again every time:', e); myProgress({ status: 'progress', progress: myBasePct, file: myLabel + ' (no browser cache on this page: open it from https or localhost)' }); }
         let myResp = myCache ? await myCache.match(myUrl) : null;
         if (myResp) { myProgress({ status: 'progress', progress: myBasePct + mySpanPct, file: myLabel + ' (cached)' }); return await myResp.arrayBuffer(); }
         myResp = await fetch(myUrl);
@@ -4925,7 +5053,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         const myBuf = new Uint8Array(myLoaded);
         let myOff = 0;
         for (const myC of myChunks) { myBuf.set(myC, myOff); myOff += myC.length; }
-        if (myCache) { try { await myCache.put(myUrl, new Response(myBuf)); } catch (e) {} }
+        if (myCache) { try { await myCache.put(myUrl, new Response(myBuf)); } catch (e) { console.warn('Could not cache ' + myLabel + ' (it will download again next time):', e); } }
         return myBuf.buffer;
     };
     const myRandn = (myCount) => {
@@ -4966,6 +5094,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         const myCanvas = document.createElement('canvas');
         myCanvas.width = 512; myCanvas.height = 512;
         const myCtx = myCanvas.getContext('2d'), myS = Math.min(myBmp.width, myBmp.height);
+        myCtx.fillStyle = '#fff'; myCtx.fillRect(0, 0, 512, 512);
         myCtx.drawImage(myBmp, (myBmp.width - myS) / 2, (myBmp.height - myS) / 2, myS, myS, 0, 0, 512, 512);
         const myPx = myCtx.getImageData(0, 0, 512, 512).data, myPlane = 512 * 512, myOut = new Float32Array(3 * myPlane);
         for (let myI = 0; myI < myPlane; myI++) {
@@ -4992,14 +5121,22 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
     // Image -> 4x64x64 latents. Input/output names are read from the model; fp16 is tried if fp32 input is rejected.
     const myEncodeImage = async (mySession, myPix) => {
         const myName = mySession.inputNames[0];
+        // The SD-Turbo encoder takes float16 input. Newer browsers need a Float16Array for that; older ones use Uint16Array bits.
+        const myHasF16 = typeof Float16Array !== 'undefined';
+        const myMakeHalf = () => new ort.Tensor('float16', myHasF16 ? Float16Array.from(myPix) : myToHalf(myPix), [1, 3, 512, 512]);
         let myRes;
-        try { myRes = await mySession.run({ [myName]: new ort.Tensor('float32', myPix, [1, 3, 512, 512]) }); }
-        catch (myErr) { myRes = await mySession.run({ [myName]: new ort.Tensor('float16', myToHalf(myPix), [1, 3, 512, 512]) }); }
+        if (mySession.myNeedsHalf) myRes = await mySession.run({ [myName]: myMakeHalf() });
+        else {
+            try { myRes = await mySession.run({ [myName]: new ort.Tensor('float32', myPix, [1, 3, 512, 512]) }); }
+            catch (myErr) { mySession.myNeedsHalf = true; myRes = await mySession.run({ [myName]: myMakeHalf() }); } // remembered, so later frames skip the failed float32 try
+        }
         const myT = myRes[mySession.outputNames[0]];
-        const myD = (myT.type === 'float16' ? myFromHalf(myT.data) : Float32Array.from(myT.data)).slice(0, 4 * 64 * 64); // keep the 4 mean channels if 8 are returned
+        const myIsHalfArray = myHasF16 && myT.data instanceof Float16Array;
+        const myD = (myT.type === 'float16' && !myIsHalfArray ? myFromHalf(myT.data) : Float32Array.from(myT.data)).slice(0, 4 * 64 * 64); // keep the 4 mean channels if 8 are returned
         let mySum = 0;
         for (let myI = 0; myI < myD.length; myI++) mySum += myD[myI] * myD[myI];
-        if (Math.sqrt(mySum / myD.length) > 2.5) for (let myI = 0; myI < myD.length; myI++) myD[myI] *= 0.18215; // encoder returned unscaled latents
+        console.log('VAE encoder: raw rms ' + Math.sqrt(mySum / myD.length).toFixed(2) + ' (unscaled latents are around 4-6)');
+        for (let myI = 0; myI < myD.length; myI++) myD[myI] *= 0.18215; // scaling_factor from the VAE config.json
         return myD;
     };
     // Turns whatever the text model replied into one clean prompt line ('' if unusable).
@@ -5035,22 +5172,34 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 const { AutoTokenizer } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
                 const myTokenizer = await AutoTokenizer.from_pretrained('Xenova/clip-vit-base-patch16');
                 ort.env.wasm.numThreads = 1;
+                try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} // ask the browser not to delete the cached models
                 const myBase = 'https://huggingface.co/' + (myModelId.includes('/') ? myModelId : 'schmuell/sd-turbo-ort-web') + '/resolve/main';
                 const myPlan = [
                     ['textEncoder', 'text encoder', myBase + '/text_encoder/model.onnx', 1700, 0, 50, { batch_size: 1 }],
                     ['unet', 'UNet', myBase + '/unet/model.onnx', 640, 50, 20, { batch_size: 1, num_channels: 4, height: 64, width: 64, sequence_length: 77 }],
                     ['vaeDecoder', 'VAE decoder', myBase + '/vae_decoder/model.onnx', 95, 70, 10, { batch_size: 1, num_channels_latent: 4, height_latent: 64, width_latent: 64 }],
-                    ['vaeEncoder', 'VAE encoder', MY_SD_VAE_ENCODER_URL, 170, 80, 20, { batch_size: 1, num_channels: 3, height: 512, width: 512 }]
+                    ['vaeEncoder', 'VAE encoder', myBase + '/vae_encoder/model.onnx', 70, 80, 20, { batch_size: 1, num_channels: 3, height: 512, width: 512 }]
                 ];
                 const mySessions = {};
                 for (const [myKey, myLabel, myUrl, myMb, myStartPct, mySpan, myDims] of myPlan) {
-                    try {
-                        const myBytes = await myImgFetchModel(myUrl, myLabel, myStartPct, mySpan, myMb, myProgress);
-                        mySessions[myKey] = await ort.InferenceSession.create(myBytes, { executionProviders: ['webgpu'], enableMemPattern: false, enableCpuMemArena: false, freeDimensionOverrides: myDims });
-                    } catch (myErr) {
-                        if (myKey !== 'vaeEncoder') throw myErr;
+                    const myUrls = (myKey === 'vaeEncoder' && myUrl !== MY_SD_VAE_ENCODER_URL) ? [myUrl, MY_SD_VAE_ENCODER_URL] : [myUrl];
+                    let myLastErr = null;
+                    for (const myTryUrl of myUrls) {
+                        for (const myUseDims of [true, false]) { // second try (encoder only) lets ONNX Runtime choose the dimensions
+                            if (!myUseDims && myKey !== 'vaeEncoder') continue;
+                            try {
+                                const myBytes = await myImgFetchModel(myTryUrl, myLabel, myStartPct, mySpan, myMb, myProgress);
+                                const myOpts = { executionProviders: ['webgpu'], enableMemPattern: false, enableCpuMemArena: false };
+                                if (myUseDims) myOpts.freeDimensionOverrides = myDims;
+                                mySessions[myKey] = await ort.InferenceSession.create(myBytes, myOpts);
+                                myLastErr = null; break;
+                            } catch (myErr) { myLastErr = myErr; console.warn(myLabel + ' failed (' + myTryUrl + '):', myErr); }
+                        }
+                        if (!myLastErr) break;
+                    }
+                    if (myLastErr) {
+                        if (myKey !== 'vaeEncoder') throw myLastErr;
                         mySessions.vaeEncoder = null; // text-to-image still works; only persistent frames need the encoder
-                        console.warn('VAE encoder failed to load:', myErr);
                     }
                 }
                 return { myTokenizer, mySessions };
@@ -5082,7 +5231,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         },
         sd15i2i: { label: 'Stable Diffusion 1.5 img2img (ONNX Runtime Web) — not implemented yet', img2img: true, disabled: true }
     };
-    let myImgState = null, myImgLoadedEngine = '', myImgHistory = [], myImgIndex = -1, myImgBusy = false, myImgStopFlag = false, myImgOriginalBlob = null;
+    let myImgState = null, myImgLoadedEngine = '', myImgHistory = [], myImgIndex = -1, myImgBusy = false, myImgStopFlag = false, myImgOriginalBlob = null, myImgNextBase = null; // myImgNextBase: one-shot start picture set by Active to original
     const myImgEl = (myId) => document.getElementById(myId);
     const myImgSetStatus = (myMsg) => { myImgEl('myImgStatus').textContent = myMsg; };
 
@@ -5135,6 +5284,13 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myImgOriginalBlob = myFile;
         myImgEl('myImgOriginal').src = URL.createObjectURL(myFile);
         myImgEl('myImgOriginal').style.display = 'block';
+        myInput.value = ''; // so choosing the same file again still works
+        if (myImgBusy) { myImgSetStatus('Starting image saved. Use Reset to original after generation stops.'); return; }
+        // Persistent mode builds on the newest frame, so the starting image is added as one.
+        myImgHistory.push({ blob: myFile, url: URL.createObjectURL(myFile), ms: 0, prompt: '(starting image)' });
+        window.myImgRenderGallery();
+        window.myImgShow(myImgHistory.length - 1);
+        myImgSetStatus('Starting image set. The next Persistent frame starts from it.');
     };
     window.myImgShow = (myI) => {
         if (!myImgHistory.length) return;
@@ -5210,7 +5366,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                     } catch (myErr) { myImgSetStatus('Text model unavailable, reusing the prompt: ' + myErr.message); }
                 }
                 const myStart = performance.now();
-                const myPrev = myImgHistory.length ? myImgHistory[myImgHistory.length - 1].blob : myImgOriginalBlob;
+                const myPrev = (myPersistent && myImgNextBase) ? myImgNextBase : (myImgHistory.length ? myImgHistory[myImgHistory.length - 1].blob : myImgOriginalBlob);
                 const myFrameNum = myImgHistory.length + 1;
                 const myTick = setInterval(() => {
                     const myMsg = 'Generating frame ' + myFrameNum + ' ... ⏱ ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s';
@@ -5220,6 +5376,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 try {
                     myBlob = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value) });
                 } finally { clearInterval(myTick); }
+                if (myPersistent) myImgNextBase = null; // used once; later frames build on the newest frame
                 myImgHistory.push({ blob: myBlob, url: URL.createObjectURL(myBlob), ms: performance.now() - myStart, prompt: myPrompt });
                 window.myImgRenderGallery();
                 window.myImgShow(myImgHistory.length - 1);
@@ -5290,11 +5447,21 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myImgBusy = false;
     };
     window.myImgStop = () => { myImgStopFlag = true; };
+    window.myImgActiveToOriginal = () => {
+        if (myImgIndex < 0 || !myImgHistory[myImgIndex]) { myImgSetStatus('Click a frame first: there is no active image.'); return; }
+        myImgOriginalBlob = myImgHistory[myImgIndex].blob;
+        myImgNextBase = myImgOriginalBlob;
+        myImgEl('myImgOriginal').src = URL.createObjectURL(myImgOriginalBlob);
+        myImgEl('myImgOriginal').style.display = 'block';
+        myImgSetStatus('Frame ' + (myImgIndex + 1) + ' is now the original. The next Persistent frame starts from it.');
+    };
     window.myImgResetOriginal = () => {
         if (!myImgOriginalBlob) { myImgSetStatus('No starting image set.'); return; }
+        myImgNextBase = null; // the pushed copy below becomes the newest frame anyway
         myImgHistory.push({ blob: myImgOriginalBlob, url: URL.createObjectURL(myImgOriginalBlob), ms: 0, prompt: '(original)' });
-        window.myImgAddCard(myImgHistory[myImgHistory.length - 1], myImgHistory.length);
+        window.myImgRenderGallery();
         window.myImgShow(myImgHistory.length - 1);
+        myImgSetStatus('Reset: the original is now the newest frame. The next Persistent frame starts from it.');
     };
     window.myImgDownload = async () => {
         if (!myImgHistory.length) return;
@@ -5358,6 +5525,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myImgEl('myImgCurrent').style.display = 'none';
         myImgEl('myImgInfo').textContent = 'No frames yet';
         myImgEl('myImgGallery').innerHTML = '';
+        myImgNextBase = null;
         myImgEl('myImgVideo').style.display = 'none';
     };
     (() => {
