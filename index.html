@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v029</title>
+<title>Ollama Local AI + Agent — v030</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -4990,59 +4990,17 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         return new Promise((myOk) => myCanvas.toBlob(myOk, 'image/png'));
     };
     // Image -> 4x64x64 latents. Input/output names are read from the model; fp16 is tried if fp32 input is rejected.
-    // myScale = true multiplies by 0.18215 (the SD latent scale). It is decided ONCE per model load by myCalibrateEncoder,
-    // not per image: the old per-image guess could skip the scaling for smooth or flat images and give blank results.
-    const myEncodeImage = async (mySession, myPix, myScale) => {
+    const myEncodeImage = async (mySession, myPix) => {
         const myName = mySession.inputNames[0];
         let myRes;
         try { myRes = await mySession.run({ [myName]: new ort.Tensor('float32', myPix, [1, 3, 512, 512]) }); }
         catch (myErr) { myRes = await mySession.run({ [myName]: new ort.Tensor('float16', myToHalf(myPix), [1, 3, 512, 512]) }); }
         const myT = myRes[mySession.outputNames[0]];
         const myD = (myT.type === 'float16' ? myFromHalf(myT.data) : Float32Array.from(myT.data)).slice(0, 4 * 64 * 64); // keep the 4 mean channels if 8 are returned
-        if (myScale) for (let myI = 0; myI < myD.length; myI++) myD[myI] *= 0.18215;
+        let mySum = 0;
+        for (let myI = 0; myI < myD.length; myI++) mySum += myD[myI] * myD[myI];
+        if (Math.sqrt(mySum / myD.length) > 2.5) for (let myI = 0; myI < myD.length; myI++) myD[myI] *= 0.18215; // encoder returned unscaled latents
         return myD;
-    };
-    // Encodes a textured test picture once and decides whether the encoder output still needs the 0.18215 scale.
-    // Unscaled latents of a textured picture have an rms around 4-6, scaled ones around 1.
-    const myCalibrateEncoder = async (mySession) => {
-        try {
-            const myPlane = 512 * 512, myPix = new Float32Array(3 * myPlane);
-            let mySeed = 7;
-            const myClip = (myV) => Math.max(-1, Math.min(1, myV));
-            for (let myY = 0; myY < 512; myY++) for (let myX = 0; myX < 512; myX++) {
-                mySeed = (mySeed * 1664525 + 1013904223) >>> 0;
-                const myNoise = mySeed / 4294967296 - 0.5, myP = myY * 512 + myX;
-                myPix[myP] = myClip(Math.sin(myX / 9 + myY / 31) + myNoise);
-                myPix[myPlane + myP] = myClip(Math.cos(myY / 13 - myX / 41) + myNoise);
-                myPix[2 * myPlane + myP] = myClip(Math.sin((myX + myY) / 19) - myNoise);
-            }
-            const myRaw = await myEncodeImage(mySession, myPix, false);
-            let mySum = 0;
-            for (let myI = 0; myI < myRaw.length; myI++) mySum += myRaw[myI] * myRaw[myI];
-            const myRms = Math.sqrt(mySum / myRaw.length), myNeedScale = !(myRms < 2.5 && myRms > 0.3);
-            console.log('VAE encoder calibration: raw rms ' + myRms.toFixed(2) + ' -> ' + (myNeedScale ? 'will multiply by 0.18215' : 'already scaled'));
-            return { myNeedScale, myInfo: 'encoder rms ' + myRms.toFixed(1) + (myNeedScale ? ' (scaled by 0.18215)' : ' (already scaled)') };
-        } catch (myErr) {
-            console.warn('VAE encoder calibration failed, using the standard scale:', myErr);
-            return { myNeedScale: true, myInfo: 'encoder calibration failed, standard scale used' };
-        }
-    };
-    // True if the picture is one flat colour (or all black from NaN values).
-    const myImgIsBlank = async (myBlob) => {
-        try {
-            const myBmp = await createImageBitmap(myBlob);
-            const myC = document.createElement('canvas'); myC.width = 64; myC.height = 64;
-            const myX = myC.getContext('2d', { willReadFrequently: true });
-            myX.drawImage(myBmp, 0, 0, 64, 64);
-            const myPx = myX.getImageData(0, 0, 64, 64).data;
-            let mySum = 0, mySum2 = 0;
-            for (let myI = 0; myI < myPx.length; myI += 4) {
-                const myL = 0.299 * myPx[myI] + 0.587 * myPx[myI + 1] + 0.114 * myPx[myI + 2];
-                mySum += myL; mySum2 += myL * myL;
-            }
-            const myMean = mySum / 4096;
-            return Math.sqrt(Math.max(0, mySum2 / 4096 - myMean * myMean)) < 4;
-        } catch (myErr) { return false; }
     };
     // Turns whatever the text model replied into one clean prompt line ('' if unusable).
     const myImgCleanPrompt = (myText) => {
@@ -5095,8 +5053,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                         console.warn('VAE encoder failed to load:', myErr);
                     }
                 }
-                const myCal = mySessions.vaeEncoder ? await myCalibrateEncoder(mySessions.vaeEncoder) : { myNeedScale: true, myInfo: 'no encoder' };
-                return { myTokenizer, mySessions, myEncoderScale: myCal.myNeedScale, myEncoderInfo: myCal.myInfo };
+                return { myTokenizer, mySessions };
             },
             generate: async (myState, myOpts) => {
                 const mySess = myState.mySessions;
@@ -5106,7 +5063,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 let myT = 999, myBaseLat = new Float32Array(4 * 64 * 64);
                 if (myOpts.initImage) {
                     if (!mySess.vaeEncoder) throw new Error('The VAE encoder did not load, so the previous image cannot be used. See the browser console.');
-                    myBaseLat = await myEncodeImage(mySess.vaeEncoder, await myImgToPixels(myOpts.initImage), myState.myEncoderScale);
+                    myBaseLat = await myEncodeImage(mySess.vaeEncoder, await myImgToPixels(myOpts.initImage));
                     myT = Math.max(1, Math.min(999, Math.round(999 * myOpts.strength)));
                 }
                 const mySigma = mySdSigma(myT), myNoise = myRandn(myBaseLat.length), myLat = new Float32Array(myBaseLat.length);
@@ -5165,7 +5122,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
             });
             myImgLoadedEngine = myKey;
             myImgEl('myImgBar').style.width = '100%';
-            myImgSetStatus('Ready: ' + myEng.label + (myImgState.myEncoderInfo ? ' · ' + myImgState.myEncoderInfo : ''));
+            myImgSetStatus('Ready: ' + myEng.label);
         } catch (myErr) {
             myImgState = null; myImgLoadedEngine = '';
             myImgSetStatus('Error loading image model: ' + myErr.message);
@@ -5255,25 +5212,14 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 const myStart = performance.now();
                 const myPrev = myImgHistory.length ? myImgHistory[myImgHistory.length - 1].blob : myImgOriginalBlob;
                 const myFrameNum = myImgHistory.length + 1;
-                let myNote = '';
                 const myTick = setInterval(() => {
-                    const myMsg = 'Generating frame ' + myFrameNum + ' ... ⏱ ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s' + myNote;
+                    const myMsg = 'Generating frame ' + myFrameNum + ' ... ⏱ ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s';
                     myImgSetStatus(myMsg); myImgEl('myImgInfo').textContent = myMsg;
                 }, 100);
-                let myBlob = null;
+                let myBlob;
                 try {
-                    // A blank (flat or all black) picture is never kept or fed forward; try again with new noise, up to 3 times.
-                    for (let myTry = 1; myTry <= 3 && !myImgStopFlag; myTry++) {
-                        const myOut = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value) });
-                        if (!(await myImgIsBlank(myOut))) { myBlob = myOut; break; }
-                        console.warn('Blank image on try ' + myTry);
-                        myNote = ' · blank image, retrying (' + myTry + ' of 3)';
-                    }
+                    myBlob = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value) });
                 } finally { clearInterval(myTick); }
-                if (!myBlob) {
-                    if (myImgStopFlag) break;
-                    throw new Error('3 blank images in a row, nothing was added. Try Normal (text to image) once, or click Load image model again.');
-                }
                 myImgHistory.push({ blob: myBlob, url: URL.createObjectURL(myBlob), ms: performance.now() - myStart, prompt: myPrompt });
                 window.myImgRenderGallery();
                 window.myImgShow(myImgHistory.length - 1);
