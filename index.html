@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v028</title>
+<title>Ollama Local AI + Agent — v029</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -901,8 +901,16 @@
         <div class="my-pull-bar-wrap"><div class="my-pull-bar" id="myImgBar"></div></div>
         <div id="myImgStatus" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px;">Not loaded.</div>
         <div class="my-field my-field-full">
-            <label for="myImgPrompt">Prompt</label>
-            <textarea id="myImgPrompt" rows="2" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">A small red robot standing in a green field, digital painting</textarea>
+            <label for="myImgPrompt">Image prompt (the text model rewrites this box each frame when the checkbox below is ticked)</label>
+            <textarea id="myImgPrompt" rows="5" oninput="window.myImgSave()" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">Golden hour portrait of an exceptionally healthy, joyful golden retriever puppy sitting in a dewy green meadow, looking directly into the camera with expressive, bright eyes and a cheerful open-mouthed expression. Soft sunrise light streams from the left, casting a warm golden glow across its fluffy fur and catching tiny rim-lighting highlights along its ears. Soft-focus background with lush green grass and distant rolling hills bathed in gentle morning mist, deep shallow depth of field, dramatic bokeh effect, cinematic lighting, 8k resolution, highly detailed photorealism.</textarea>
+            <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:3px;">SD-Turbo only reads the first ~75 tokens (about 55 words); words after that are ignored. Janus-Pro reads the whole prompt.</div>
+        </div>
+        <div class="my-field my-field-full" style="margin-top:8px;">
+            <label for="myImgInstructions">Instructions for the text model (permanent: never changed, never shown in the image prompt, only used when the checkbox below is ticked)</label>
+            <textarea id="myImgInstructions" rows="5" oninput="window.myImgSave()" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">You are writing the image prompts for a continuous image sequence, one prompt per frame. Each time, I give you the previous frame's prompt. Reply with the next frame's prompt ONLY: one paragraph, no quotes, no title, no explanation.
+Keep all scene variables constant, word for word: [Subject ID], [Environment], [Lighting: sunrise from the left], [Depth of Field] and the style words (cinematic, 8k, photorealism).
+Modify ONLY the [Action Delta] (the subject's pose, head angle, expression, ears or paws) by one tiny micro-increment, like the next frame of a slow smooth movie. Never jump to a new pose.
+Write the changed action in the first sentence, because the image model only reads the first 75 or so tokens.</textarea>
         </div>
         <div class="my-config-row" style="margin-top:8px;">
             <div class="my-field"><label for="myImgMode">Mode</label>
@@ -927,14 +935,18 @@
             <button class="my-btn my-btn-secondary" onclick="window.myImgShow(myImgIndex+1)">Next ▶</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgDownload()">Download all</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgDownloadZip()">Download zip</button>
+            <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">MP4 seconds per frame <input type="number" id="myImgSecPerFrame" value="0.5" min="0.05" step="0.05" style="width:70px;" /></label>
+            <button class="my-btn my-btn-primary" onclick="window.myImgMakeMp4()">🎬 Make MP4</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgClear()">Clear history</button>
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
             <div><div class="my-chat-meta">Original</div><img id="myImgOriginal" alt="original" style="max-width:100%;max-height:360px;display:none;border:1px solid var(--border);" /></div>
             <div><div class="my-chat-meta" id="myImgInfo">No frames yet</div><img id="myImgCurrent" alt="current frame" style="max-width:100%;max-height:360px;display:none;border:1px solid var(--border);" /></div>
         </div>
-        <div class="my-chat-meta" style="margin-top:10px;">All frames</div>
+        <div class="my-chat-meta" style="margin-top:10px;">All frames (drag a card to reorder, or use ◀ ▶; ✕ deletes it)</div>
         <div id="myImgGallery" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+        <div class="my-chat-meta" style="margin-top:10px;">MP4 preview</div>
+        <video id="myImgVideo" controls loop style="display:none;max-width:100%;max-height:360px;border:1px solid var(--border);"></video>
     </div>
 </div>
 
@@ -3859,15 +3871,17 @@ exactly as shown for every file.`;
     // Calls whichever backend is currently active (Ollama server, or the local
     // WebGPU engine) once, non-streaming, and returns the full text. Uses the
     // same Model / Context Window / System Prompt fields as the main chat UI.
-    const myAgentAskModel = async (myPromptText) => {
+    // mySystemOverride (optional): permanent instructions for this one call (used by the image frame writer).
+    // Ollama gets them as the system message; WebGPU gets them in front of the message.
+    const myAgentAskModel = async (myPromptText, mySystemOverride) => {
         myAgentLastStats = null;
         myAgentAbort = new AbortController();
         try {
             if (myBackendMode === 'webgpu') {
-                return await myWebgpuAskOnce(myPromptText);
+                return await myWebgpuAskOnce(mySystemOverride ? 'INSTRUCTIONS (follow them exactly):\n' + mySystemOverride + '\n\n' + myPromptText : myPromptText);
             }
             const myModelName = document.getElementById('myModelInput').value.trim() || MY_DEFAULT_MODEL;
-            const mySysPrompt = document.getElementById('mySysPromptInput').value.trim();
+            const mySysPrompt = (mySystemOverride || '').trim() || document.getElementById('mySysPromptInput').value.trim();
             const myNumCtx = parseInt(document.getElementById('myCtxSelect').value, 10);
             const myMessages = [];
             if (mySysPrompt) myMessages.push({ role: 'system', content: mySysPrompt });
@@ -4976,17 +4990,65 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         return new Promise((myOk) => myCanvas.toBlob(myOk, 'image/png'));
     };
     // Image -> 4x64x64 latents. Input/output names are read from the model; fp16 is tried if fp32 input is rejected.
-    const myEncodeImage = async (mySession, myPix) => {
+    // myScale = true multiplies by 0.18215 (the SD latent scale). It is decided ONCE per model load by myCalibrateEncoder,
+    // not per image: the old per-image guess could skip the scaling for smooth or flat images and give blank results.
+    const myEncodeImage = async (mySession, myPix, myScale) => {
         const myName = mySession.inputNames[0];
         let myRes;
         try { myRes = await mySession.run({ [myName]: new ort.Tensor('float32', myPix, [1, 3, 512, 512]) }); }
         catch (myErr) { myRes = await mySession.run({ [myName]: new ort.Tensor('float16', myToHalf(myPix), [1, 3, 512, 512]) }); }
         const myT = myRes[mySession.outputNames[0]];
         const myD = (myT.type === 'float16' ? myFromHalf(myT.data) : Float32Array.from(myT.data)).slice(0, 4 * 64 * 64); // keep the 4 mean channels if 8 are returned
-        let mySum = 0;
-        for (let myI = 0; myI < myD.length; myI++) mySum += myD[myI] * myD[myI];
-        if (Math.sqrt(mySum / myD.length) > 2.5) for (let myI = 0; myI < myD.length; myI++) myD[myI] *= 0.18215; // encoder returned unscaled latents
+        if (myScale) for (let myI = 0; myI < myD.length; myI++) myD[myI] *= 0.18215;
         return myD;
+    };
+    // Encodes a textured test picture once and decides whether the encoder output still needs the 0.18215 scale.
+    // Unscaled latents of a textured picture have an rms around 4-6, scaled ones around 1.
+    const myCalibrateEncoder = async (mySession) => {
+        try {
+            const myPlane = 512 * 512, myPix = new Float32Array(3 * myPlane);
+            let mySeed = 7;
+            const myClip = (myV) => Math.max(-1, Math.min(1, myV));
+            for (let myY = 0; myY < 512; myY++) for (let myX = 0; myX < 512; myX++) {
+                mySeed = (mySeed * 1664525 + 1013904223) >>> 0;
+                const myNoise = mySeed / 4294967296 - 0.5, myP = myY * 512 + myX;
+                myPix[myP] = myClip(Math.sin(myX / 9 + myY / 31) + myNoise);
+                myPix[myPlane + myP] = myClip(Math.cos(myY / 13 - myX / 41) + myNoise);
+                myPix[2 * myPlane + myP] = myClip(Math.sin((myX + myY) / 19) - myNoise);
+            }
+            const myRaw = await myEncodeImage(mySession, myPix, false);
+            let mySum = 0;
+            for (let myI = 0; myI < myRaw.length; myI++) mySum += myRaw[myI] * myRaw[myI];
+            const myRms = Math.sqrt(mySum / myRaw.length), myNeedScale = !(myRms < 2.5 && myRms > 0.3);
+            console.log('VAE encoder calibration: raw rms ' + myRms.toFixed(2) + ' -> ' + (myNeedScale ? 'will multiply by 0.18215' : 'already scaled'));
+            return { myNeedScale, myInfo: 'encoder rms ' + myRms.toFixed(1) + (myNeedScale ? ' (scaled by 0.18215)' : ' (already scaled)') };
+        } catch (myErr) {
+            console.warn('VAE encoder calibration failed, using the standard scale:', myErr);
+            return { myNeedScale: true, myInfo: 'encoder calibration failed, standard scale used' };
+        }
+    };
+    // True if the picture is one flat colour (or all black from NaN values).
+    const myImgIsBlank = async (myBlob) => {
+        try {
+            const myBmp = await createImageBitmap(myBlob);
+            const myC = document.createElement('canvas'); myC.width = 64; myC.height = 64;
+            const myX = myC.getContext('2d', { willReadFrequently: true });
+            myX.drawImage(myBmp, 0, 0, 64, 64);
+            const myPx = myX.getImageData(0, 0, 64, 64).data;
+            let mySum = 0, mySum2 = 0;
+            for (let myI = 0; myI < myPx.length; myI += 4) {
+                const myL = 0.299 * myPx[myI] + 0.587 * myPx[myI + 1] + 0.114 * myPx[myI + 2];
+                mySum += myL; mySum2 += myL * myL;
+            }
+            const myMean = mySum / 4096;
+            return Math.sqrt(Math.max(0, mySum2 / 4096 - myMean * myMean)) < 4;
+        } catch (myErr) { return false; }
+    };
+    // Turns whatever the text model replied into one clean prompt line ('' if unusable).
+    const myImgCleanPrompt = (myText) => {
+        let myP = (myText || '').trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '');
+        myP = myP.replace(/\s*\n\s*/g, ' ').replace(/^(next frame prompt|new prompt|prompt)\s*[:\-]\s*/i, '').replace(/^["'“]+|["'”]+$/g, '').trim();
+        return myP.length >= 20 ? myP : '';
     };
     const myImgEngines = {
         janus: {
@@ -5033,7 +5095,8 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                         console.warn('VAE encoder failed to load:', myErr);
                     }
                 }
-                return { myTokenizer, mySessions };
+                const myCal = mySessions.vaeEncoder ? await myCalibrateEncoder(mySessions.vaeEncoder) : { myNeedScale: true, myInfo: 'no encoder' };
+                return { myTokenizer, mySessions, myEncoderScale: myCal.myNeedScale, myEncoderInfo: myCal.myInfo };
             },
             generate: async (myState, myOpts) => {
                 const mySess = myState.mySessions;
@@ -5043,7 +5106,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 let myT = 999, myBaseLat = new Float32Array(4 * 64 * 64);
                 if (myOpts.initImage) {
                     if (!mySess.vaeEncoder) throw new Error('The VAE encoder did not load, so the previous image cannot be used. See the browser console.');
-                    myBaseLat = await myEncodeImage(mySess.vaeEncoder, await myImgToPixels(myOpts.initImage));
+                    myBaseLat = await myEncodeImage(mySess.vaeEncoder, await myImgToPixels(myOpts.initImage), myState.myEncoderScale);
                     myT = Math.max(1, Math.min(999, Math.round(999 * myOpts.strength)));
                 }
                 const mySigma = mySdSigma(myT), myNoise = myRandn(myBaseLat.length), myLat = new Float32Array(myBaseLat.length);
@@ -5068,7 +5131,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
 
     window.myImgToggle = () => { myImgEl('myImgBody').classList.toggle('open'); };
     window.myImgSave = () => {
-        try { localStorage.setItem('myImgConfig025', JSON.stringify({ model: myImgEl('myImgModelInput').value, engine: myImgEl('myImgEngineSelect').value })); } catch (e) {}
+        try { localStorage.setItem('myImgConfig025', JSON.stringify({ model: myImgEl('myImgModelInput').value, engine: myImgEl('myImgEngineSelect').value, prompt: myImgEl('myImgPrompt').value, instructions: myImgEl('myImgInstructions').value })); } catch (e) {}
     };
     window.myImgUpdateControls = () => {
         const myEng = myImgEngines[myImgEl('myImgEngineSelect').value];
@@ -5102,7 +5165,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
             });
             myImgLoadedEngine = myKey;
             myImgEl('myImgBar').style.width = '100%';
-            myImgSetStatus('Ready: ' + myEng.label);
+            myImgSetStatus('Ready: ' + myEng.label + (myImgState.myEncoderInfo ? ' · ' + myImgState.myEncoderInfo : ''));
         } catch (myErr) {
             myImgState = null; myImgLoadedEngine = '';
             myImgSetStatus('Error loading image model: ' + myErr.message);
@@ -5124,17 +5187,52 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myImgEl('myImgCurrent').style.display = 'block';
         myImgEl('myImgInfo').textContent = 'Frame ' + (myImgIndex + 1) + ' of ' + myImgHistory.length + ' · ' + (myF.ms / 1000).toFixed(1) + ' s';
     };
-    window.myImgAddCard = (myF, myNum) => {
-        const myCard = document.createElement('div');
-        myCard.style.cssText = 'width:220px;border:1px solid var(--border);padding:6px;font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);';
-        const myPic = document.createElement('img');
-        myPic.src = myF.url; myPic.style.cssText = 'width:100%;cursor:pointer;';
-        myPic.onclick = () => window.myImgShow(myNum - 1);
-        const myCap = document.createElement('div');
-        myCap.textContent = 'Frame ' + myNum + ' · ' + (myF.ms / 1000).toFixed(1) + ' s · ' + myF.prompt;
-        myCard.appendChild(myPic); myCard.appendChild(myCap);
-        myImgEl('myImgGallery').appendChild(myCard);
+    // ── Gallery: drag and drop, move buttons, delete ──
+    let myImgDragFrom = -1;
+    window.myImgRenderGallery = () => {
+        const myG = myImgEl('myImgGallery');
+        myG.innerHTML = '';
+        myImgHistory.forEach((myF, myI) => {
+            const myCard = document.createElement('div');
+            myCard.draggable = true;
+            myCard.style.cssText = 'width:220px;border:1px solid var(--border);padding:6px;font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);cursor:grab;';
+            myCard.setAttribute('ondragstart', 'window.myImgDragStart(' + myI + ')');
+            myCard.setAttribute('ondragover', "event.preventDefault(); this.style.outline='2px solid #bc8cff'");
+            myCard.setAttribute('ondragleave', "this.style.outline=''");
+            myCard.setAttribute('ondrop', "event.preventDefault(); this.style.outline=''; window.myImgDrop(" + myI + ")");
+            myCard.innerHTML = '<img src="' + myF.url + '" draggable="false" style="width:100%;cursor:pointer;" onclick="window.myImgShow(' + myI + ')" />'
+                + '<div class="my-card-cap"></div>'
+                + '<div style="display:flex;gap:4px;margin-top:4px;">'
+                + '<button class="my-btn my-btn-secondary my-btn-sm" title="Move earlier" onclick="window.myImgMove(' + myI + ',' + (myI - 1) + ')">◀</button>'
+                + '<button class="my-btn my-btn-secondary my-btn-sm" title="Move later" onclick="window.myImgMove(' + myI + ',' + (myI + 1) + ')">▶</button>'
+                + '<button class="my-btn my-btn-secondary my-btn-sm" title="Delete this frame" onclick="window.myImgDelete(' + myI + ')">✕</button></div>';
+            const myCap = myCard.querySelector('.my-card-cap');
+            myCap.textContent = 'Frame ' + (myI + 1) + ' · ' + (myF.ms / 1000).toFixed(1) + ' s · ' + myF.prompt.slice(0, 80) + (myF.prompt.length > 80 ? '…' : '');
+            myCap.title = myF.prompt;
+            myG.appendChild(myCard);
+        });
     };
+    window.myImgAddCard = () => window.myImgRenderGallery();
+    window.myImgDragStart = (myI) => { myImgDragFrom = myI; };
+    window.myImgDrop = (myI) => { if (myImgDragFrom >= 0) window.myImgMove(myImgDragFrom, myI); myImgDragFrom = -1; };
+    window.myImgMove = (myFrom, myTo) => {
+        if (myImgBusy) { myImgSetStatus('Wait until generation has stopped before changing the order.'); return; }
+        if (myFrom === myTo || myFrom < 0 || myTo < 0 || myFrom >= myImgHistory.length || myTo >= myImgHistory.length) return;
+        const myItem = myImgHistory.splice(myFrom, 1)[0];
+        myImgHistory.splice(myTo, 0, myItem);
+        window.myImgRenderGallery();
+        window.myImgShow(myTo);
+    };
+    window.myImgDelete = (myI) => {
+        if (myImgBusy) { myImgSetStatus('Wait until generation has stopped before deleting frames.'); return; }
+        if (myI < 0 || myI >= myImgHistory.length) return;
+        const myGone = myImgHistory.splice(myI, 1)[0];
+        window.myImgRenderGallery();
+        if (myImgHistory.length) window.myImgShow(Math.min(myI, myImgHistory.length - 1));
+        else { myImgIndex = -1; myImgEl('myImgCurrent').style.display = 'none'; myImgEl('myImgInfo').textContent = 'No frames yet'; }
+        URL.revokeObjectURL(myGone.url);
+    };
+
     window.myImgRun = async (myCount) => {
         if (myImgBusy) return;
         const myKey = myImgEl('myImgEngineSelect').value, myEng = myImgEngines[myKey];
@@ -5148,29 +5246,100 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 if (myImgEl('myImgUseLlm').checked && myImgHistory.length) {
                     try {
                         myImgSetStatus('Asking the text model for the next change ...');
-                        const myIdea = await myAgentAskModel('The last image prompt was: "' + myPrompt + '". Reply with the new prompt only: the same scene with one small visual change.');
-                        if (myIdea && myIdea.trim()) { myPrompt = myIdea.trim().split('\n')[0]; myImgEl('myImgPrompt').value = myPrompt; }
+                        const myIdea = await myAgentAskModel('Previous frame prompt:\n' + myPrompt + '\n\nWrite the prompt for the next frame.', myImgEl('myImgInstructions').value);
+                        const myClean = myImgCleanPrompt(myIdea);
+                        if (myClean) { myPrompt = myClean; myImgEl('myImgPrompt').value = myPrompt; window.myImgSave(); }
+                        else myImgSetStatus('The text model gave no usable prompt, reusing the last one.');
                     } catch (myErr) { myImgSetStatus('Text model unavailable, reusing the prompt: ' + myErr.message); }
                 }
                 const myStart = performance.now();
-                myImgSetStatus('Generating frame ' + (myImgHistory.length + 1) + ' ...');
                 const myPrev = myImgHistory.length ? myImgHistory[myImgHistory.length - 1].blob : myImgOriginalBlob;
                 const myFrameNum = myImgHistory.length + 1;
+                let myNote = '';
                 const myTick = setInterval(() => {
-                    const myMsg = 'Generating frame ' + myFrameNum + ' ... ⏱ ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s';
+                    const myMsg = 'Generating frame ' + myFrameNum + ' ... ⏱ ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s' + myNote;
                     myImgSetStatus(myMsg); myImgEl('myImgInfo').textContent = myMsg;
                 }, 100);
-                let myBlob;
+                let myBlob = null;
                 try {
-                    myBlob = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value) });
+                    // A blank (flat or all black) picture is never kept or fed forward; try again with new noise, up to 3 times.
+                    for (let myTry = 1; myTry <= 3 && !myImgStopFlag; myTry++) {
+                        const myOut = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value) });
+                        if (!(await myImgIsBlank(myOut))) { myBlob = myOut; break; }
+                        console.warn('Blank image on try ' + myTry);
+                        myNote = ' · blank image, retrying (' + myTry + ' of 3)';
+                    }
                 } finally { clearInterval(myTick); }
+                if (!myBlob) {
+                    if (myImgStopFlag) break;
+                    throw new Error('3 blank images in a row, nothing was added. Try Normal (text to image) once, or click Load image model again.');
+                }
                 myImgHistory.push({ blob: myBlob, url: URL.createObjectURL(myBlob), ms: performance.now() - myStart, prompt: myPrompt });
-                window.myImgAddCard(myImgHistory[myImgHistory.length - 1], myImgHistory.length);
+                window.myImgRenderGallery();
                 window.myImgShow(myImgHistory.length - 1);
             }
             myImgSetStatus(myImgStopFlag ? 'Stopped.' : 'Done.');
         } catch (myErr) {
             myImgSetStatus('Generation error: ' + myErr.message);
+        }
+        myImgBusy = false;
+    };
+
+    // ── MP4 (WebCodecs H.264 + mp4-muxer from a CDN), frames in gallery order ──
+    window.myImgMakeMp4 = async () => {
+        if (!myImgHistory.length) { myImgSetStatus('No frames to make a video from.'); return; }
+        if (myImgBusy) { myImgSetStatus('Wait until generation has stopped before making the MP4.'); return; }
+        if (!window.VideoEncoder) { myImgSetStatus('This browser has no WebCodecs (VideoEncoder). Use Chrome or Edge.'); return; }
+        myImgBusy = true;
+        try {
+            myImgSetStatus('Loading the MP4 writer ...');
+            const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/+esm');
+            const myFps = 30;
+            const myRepeat = Math.max(1, Math.round((parseFloat(myImgEl('myImgSecPerFrame').value) || 0.5) * myFps));
+            const myFirst = await createImageBitmap(myImgHistory[0].blob);
+            const myShrink = Math.min(1, 1024 / Math.max(myFirst.width, myFirst.height));
+            const myW = Math.max(2, Math.floor(myFirst.width * myShrink / 2) * 2), myH = Math.max(2, Math.floor(myFirst.height * myShrink / 2) * 2);
+            let myCodec = '';
+            for (const myC of ['avc1.640028', 'avc1.4d0028', 'avc1.42001f']) {
+                const myOk = await VideoEncoder.isConfigSupported({ codec: myC, width: myW, height: myH, bitrate: 4e6, framerate: myFps });
+                if (myOk.supported) { myCodec = myC; break; }
+            }
+            if (!myCodec) throw new Error('This browser cannot encode H.264 video. Try Chrome or Edge.');
+            const myMuxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: myW, height: myH }, fastStart: 'in-memory' });
+            let myEncError = null;
+            const myEncoder = new VideoEncoder({ output: (myChunk, myMeta) => myMuxer.addVideoChunk(myChunk, myMeta), error: (myE) => { myEncError = myE; } });
+            myEncoder.configure({ codec: myCodec, width: myW, height: myH, bitrate: 4e6, framerate: myFps });
+            const myCanvas = document.createElement('canvas'); myCanvas.width = myW; myCanvas.height = myH;
+            const myCtx = myCanvas.getContext('2d');
+            let myT = 0;
+            for (let myI = 0; myI < myImgHistory.length; myI++) {
+                myImgSetStatus('Making MP4: frame ' + (myI + 1) + ' of ' + myImgHistory.length + ' ...');
+                const myBmp = await createImageBitmap(myImgHistory[myI].blob);
+                const myK = Math.min(myW / myBmp.width, myH / myBmp.height);
+                myCtx.fillStyle = '#000'; myCtx.fillRect(0, 0, myW, myH);
+                myCtx.drawImage(myBmp, (myW - myBmp.width * myK) / 2, (myH - myBmp.height * myK) / 2, myBmp.width * myK, myBmp.height * myK);
+                myBmp.close();
+                for (let myR = 0; myR < myRepeat; myR++) {
+                    if (myEncError) throw myEncError;
+                    while (myEncoder.encodeQueueSize > 10) await new Promise((myOk) => setTimeout(myOk, 5));
+                    const myVf = new VideoFrame(myCanvas, { timestamp: Math.round(myT * 1e6 / myFps), duration: Math.round(1e6 / myFps) });
+                    myEncoder.encode(myVf, { keyFrame: myT % 60 === 0 });
+                    myVf.close(); myT++;
+                }
+            }
+            await myEncoder.flush();
+            if (myEncError) throw myEncError;
+            myEncoder.close(); myMuxer.finalize();
+            const myUrl = URL.createObjectURL(new Blob([myMuxer.target.buffer], { type: 'video/mp4' }));
+            const myVid = myImgEl('myImgVideo');
+            if (myVid.dataset.url) URL.revokeObjectURL(myVid.dataset.url);
+            myVid.dataset.url = myUrl; myVid.src = myUrl; myVid.style.display = 'block';
+            const myA = document.createElement('a');
+            myA.href = myUrl; myA.download = 'image-frames.mp4';
+            document.body.appendChild(myA); myA.click(); myA.remove();
+            myImgSetStatus('MP4 done: ' + myImgHistory.length + ' frames, ' + (myT / myFps).toFixed(1) + ' s, ' + myW + 'x' + myH + '.');
+        } catch (myErr) {
+            myImgSetStatus('MP4 error: ' + myErr.message);
         }
         myImgBusy = false;
     };
@@ -5243,6 +5412,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myImgEl('myImgCurrent').style.display = 'none';
         myImgEl('myImgInfo').textContent = 'No frames yet';
         myImgEl('myImgGallery').innerHTML = '';
+        myImgEl('myImgVideo').style.display = 'none';
     };
     (() => {
         const mySelEl = myImgEl('myImgEngineSelect');
@@ -5255,6 +5425,8 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
             const mySaved = JSON.parse(localStorage.getItem('myImgConfig025') || '{}');
             if (typeof mySaved.model === 'string') myImgEl('myImgModelInput').value = mySaved.model;
             if (mySaved.engine && myImgEngines[mySaved.engine]) mySelEl.value = mySaved.engine;
+            if (typeof mySaved.prompt === 'string' && mySaved.prompt.trim()) myImgEl('myImgPrompt').value = mySaved.prompt;
+            if (typeof mySaved.instructions === 'string' && mySaved.instructions.trim()) myImgEl('myImgInstructions').value = mySaved.instructions;
         } catch (e) {}
         window.myImgUpdateControls();
     })();
