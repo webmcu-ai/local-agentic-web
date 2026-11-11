@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v034</title>
+<title>Ollama Local AI + Agent — v035</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -918,6 +918,7 @@
                     <li><b>Change amount</b>: how far the next image may move away from the previous one. Low = small steps, high = big changes. Only used by engines that support image-to-image.</li>
                     <li><b>Let the text model suggest each next change</b>: once a frame or starting image exists, the text model reads the last prompt plus the <b>Instructions</b> box and rewrites the Image prompt box. The Instructions box is permanent: it is never edited and never becomes part of the image prompt.</li>
                     <li><b>Active to original</b> sets the frame you clicked as the original and makes the next Persistent frame start from it. <b>Reset to original</b> adds the original again as the newest frame.</li>
+                    <li><b>Reverse frames</b> flips the order of the frames shown (screen, zip and MP4) and does not change how future frames are made. For example: generate younger faces, reverse, then continue from the original to make older ones, and the video runs young to old.</li>
                     <li>Frames can be dragged to reorder (or use ◀ ▶), deleted with ✕, and turned into a video with <b>Make MP4</b> in gallery order.</li>
                 </ul>
                 <h4>Model differences</h4>
@@ -977,6 +978,7 @@ Write the changed action in the first sentence, because the image model only rea
             <button class="my-btn my-btn-secondary" onclick="window.myImgStop()">Stop</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgResetOriginal()">Reset to original</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgActiveToOriginal()" title="Make the frame you clicked on the original that the next Persistent frame starts from">Active to original</button>
+            <button class="my-btn my-btn-secondary" onclick="window.myImgReverse()" title="Reverse the order of the frames shown (screen, zip and MP4). Future frames are not affected.">⇄ Reverse frames</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgShow(myImgIndex-1)">◀ Prev</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgShow(myImgIndex+1)">Next ▶</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgDownload()">Download all</button>
@@ -5455,6 +5457,17 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myImgBusy = false;
     };
     window.myImgStop = () => { myImgStopFlag = true; };
+    window.myImgReverse = () => {
+        if (myImgBusy) { myImgSetStatus('Wait until generation has stopped before reversing the frames.'); return; }
+        if (myImgHistory.length < 2) { myImgSetStatus('Need at least 2 frames to reverse.'); return; }
+        // Future frames keep building on the picture that was newest before the reversal (used once, like Active to original)
+        if (!myImgNextBase) myImgNextBase = myImgHistory[myImgHistory.length - 1].blob;
+        const myOldIndex = myImgIndex;
+        myImgHistory.reverse();
+        window.myImgRenderGallery();
+        window.myImgShow(myOldIndex >= 0 ? myImgHistory.length - 1 - myOldIndex : myImgHistory.length - 1);
+        myImgSetStatus('Frames reversed. Screen, zip and MP4 use the new order; future frames are not affected.');
+    };
     window.myImgActiveToOriginal = () => {
         if (myImgIndex < 0 || !myImgHistory[myImgIndex]) { myImgSetStatus('Click a frame first: there is no active image.'); return; }
         myImgOriginalBlob = myImgHistory[myImgIndex].blob;
