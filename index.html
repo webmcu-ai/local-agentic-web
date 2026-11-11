@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v033</title>
+<title>Ollama Local AI + Agent — v034</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -261,9 +261,10 @@
 
 
         /* ── Help sections (collapsed by default) ── */
-        .my-help { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-base); margin: 6px 0 10px; }
-        .my-help > summary { cursor: pointer; padding: 7px 10px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-blue); user-select: none; }
-        .my-help > summary:hover { color: var(--text-primary); }
+        .my-help { border: 1px solid var(--accent-orange); border-radius: var(--radius-lg); background: var(--bg-panel); margin: 6px 0 10px; overflow: hidden; }
+        .my-help > summary { cursor: pointer; padding: 10px 14px; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; color: var(--accent-orange); background: rgba(210,153,34,0.08); user-select: none; }
+        .my-help > summary:hover { background: rgba(210,153,34,0.13); }
+        .my-help[open] > summary { border-bottom: 1px solid rgba(210,153,34,0.25); }
         .my-help-body { padding: 2px 12px 10px; font-size: 0.75rem; line-height: 1.6; color: var(--text-secondary); }
         .my-help-body h4 { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--text-primary); margin: 10px 0 3px; }
         .my-help-body ul, .my-help-body ol { padding-left: 18px; }
@@ -580,6 +581,13 @@
         .my-rep-final h4 { margin:8px 0 2px 0; font-size:0.78rem; color:var(--accent-blue); }
         .my-rep-change { border-top:1px dashed var(--border); padding:4px 0; }
         .my-rep-chip { padding:1px 8px; border-radius:10px; font-size:0.68rem; color:#fff; white-space:nowrap; }
+
+        /* ── Main section titles: one size and one color (change --my-section-color to try another) ── */
+        :root { --my-section-color: var(--accent-red); }
+        .my-chat-label, .my-tools-header-left, #myImgPanel > .my-collapsible-toggle {
+            font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600;
+            color: var(--my-section-color); text-transform: uppercase; letter-spacing: 0.06em;
+        }
     </style>
 </head>
 <body>
@@ -965,7 +973,7 @@ Write the changed action in the first sentence, because the image model only rea
         </div>
         <div class="my-btn-row">
             <button class="my-btn my-btn-primary" onclick="window.myImgRun(1)">Generate / Next frame</button>
-            <button class="my-btn my-btn-secondary" onclick="window.myImgRun(parseInt(document.getElementById('myImgFrames').value,10)||1)">Continuous generate</button>
+            <button class="my-btn my-btn-primary" onclick="window.myImgRun(parseInt(document.getElementById('myImgFrames').value,10)||1)">Continuous generate</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgStop()">Stop</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgResetOriginal()">Reset to original</button>
             <button class="my-btn my-btn-secondary" onclick="window.myImgActiveToOriginal()" title="Make the frame you clicked on the original that the next Persistent frame starts from">Active to original</button>
@@ -1119,7 +1127,7 @@ Write the changed action in the first sentence, because the image model only rea
             <!-- HTML tab -->
             <div class="my-tab-panel active" id="myTabHtml">
                 <div class="my-btn-row">
-                    <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myExtractHtml()">Extract HTML</button>
+                    <button class="my-btn my-btn-primary my-btn-sm" onclick="window.myExtractHtml()">Extract HTML</button>
                     <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myRenderHtml()">Render in New Tab</button>
                     <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myCopyHtml()">Copy Code</button>
                 </div>
@@ -1255,7 +1263,7 @@ console.log("hi");</pre>
 
             <div class="my-section-label">1 · Folder</div>
             <div class="my-btn-row" style="margin-bottom: 8px;">
-                <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myPickAgentFolder()">Select / Create Agent Folder</button>
+                <button class="my-btn my-btn-primary my-btn-sm" onclick="window.myPickAgentFolder()">Select / Create Agent Folder</button>
                 <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myRelinkAgentFolder()">Relink Last Folder</button>
                 <button class="my-btn my-btn-secondary my-btn-sm" onclick="window.myWriteConfigToFolder()">Save config.json</button>
             </div>
@@ -1416,7 +1424,7 @@ console.log("hi");</pre>
         </details>
         <div style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">Uses the backend chosen at the top (Ollama or WebGPU) and the model set above. Writes are only proposals you approve. The agent cannot compile, flash or run code. Serial needs Chrome/Edge on https or localhost.</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-            <button class="my-btn my-btn-secondary my-btn-sm" onclick="myPickCodeFolder()">Select / Create Coding Folder</button>
+            <button class="my-btn my-btn-primary my-btn-sm" onclick="myPickCodeFolder()">Select / Create Coding Folder</button>
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="myRelinkCodeFolder()">Relink Last Coding Folder</button>
             <button class="my-btn my-btn-green my-btn-sm" id="myAgDemoBtn" onclick="myCreateDemoFiles()" disabled>Create demo files</button>
             <span style="font-size:0.75rem;font-family:var(--font-mono);">Coding folder: <strong id="myAgFolderLabel" style="color:var(--accent-green);">none selected</strong></span>
