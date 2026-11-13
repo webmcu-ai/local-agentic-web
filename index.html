@@ -917,6 +917,7 @@
                     <li><b>Normal</b>: a new image from the text alone. <b>Persistent</b>: the newest frame is the starting point for the next one, so a sequence changes gradually.</li>
                     <li><b>Change amount</b>: how far the next image may move away from the previous one. Low = small steps, high = big changes. Only used by engines that support image-to-image.</li>
                     <li><b>Let the text model suggest each next change</b>: once a frame or starting image exists, the text model reads the last prompt plus the <b>Instructions</b> box and rewrites the Image prompt box. The Instructions box is permanent: it is never edited and never becomes part of the image prompt.</li>
+                    <li><b>Final image</b>: optional goal picture. With <b>Let the text model suggest each next change</b> checked, the text model looks at the present image and the final image and rewrites the Image prompt box with what needs to change. Needs an Ollama vision model; the WebGPU engine here is text only, so it ignores the final image.</li>
                     <li><b>Active to original</b> sets the frame you clicked as the original and makes the next Persistent frame start from it. <b>Reset to original</b> adds the original again as the newest frame.</li>
                     <li><b>Reverse frames</b> flips the order of the frames shown (screen, zip and MP4) and does not change how future frames are made. For example: generate younger faces, reverse, then continue from the original to make older ones, and the video runs young to old.</li>
                     <li>Frames can be dragged to reorder (or use ◀ ▶), deleted with ✕, and turned into a video with <b>Make MP4</b> in gallery order.</li>
@@ -970,6 +971,8 @@ Write the changed action in the first sentence, because the image model only rea
                 <input type="number" id="myImgFrames" value="4" min="1" max="200" style="width:80px;" /></div>
             <div class="my-field"><label for="myImgStartFile">Starting image</label>
                 <input type="file" id="myImgStartFile" accept="image/*" onchange="window.myImgSetStart(this)" /></div>
+            <div class="my-field"><label for="myImgFinalFile">Final image</label>
+                <input type="file" id="myImgFinalFile" accept="image/*" onchange="window.myImgSetFinal(this)" /></div>
             <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);"><input type="checkbox" id="myImgUseLlm" /> Let the text model suggest each next change</label>
         </div>
         <div class="my-btn-row">
@@ -989,6 +992,7 @@ Write the changed action in the first sentence, because the image model only rea
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
             <div><div class="my-chat-meta">Original</div><img id="myImgOriginal" alt="original" style="max-width:100%;max-height:360px;display:none;border:1px solid var(--border);" /></div>
+            <div><div class="my-chat-meta">Final</div><img id="myImgFinal" alt="final" style="max-width:100%;max-height:360px;display:none;border:1px solid var(--border);" /></div>
             <div><div class="my-chat-meta" id="myImgInfo">No frames yet</div><img id="myImgCurrent" alt="current frame" style="max-width:100%;max-height:360px;display:none;border:1px solid var(--border);" /></div>
         </div>
         <div class="my-chat-meta" style="margin-top:10px;">All frames (drag a card to reorder, or use ◀ ▶; ✕ deletes it)</div>
@@ -4008,8 +4012,9 @@ exactly as shown for every file.`;
     // WebGPU engine) once, non-streaming, and returns the full text. Uses the
     // same Model / Context Window / System Prompt fields as the main chat UI.
     // mySystemOverride (optional): permanent instructions for this one call (used by the image frame writer).
+    // myImages (optional): base64 pictures for the Ollama user message (WebGPU here is text only).
     // Ollama gets them as the system message; WebGPU gets them in front of the message.
-    const myAgentAskModel = async (myPromptText, mySystemOverride) => {
+    const myAgentAskModel = async (myPromptText, mySystemOverride, myImages) => {
         myAgentLastStats = null;
         myAgentAbort = new AbortController();
         try {
@@ -4021,7 +4026,9 @@ exactly as shown for every file.`;
             const myNumCtx = parseInt(document.getElementById('myCtxSelect').value, 10);
             const myMessages = [];
             if (mySysPrompt) myMessages.push({ role: 'system', content: mySysPrompt });
-            myMessages.push({ role: 'user', content: myPromptText });
+            const myUserMsg = { role: 'user', content: myPromptText };
+            if (myImages && myImages.length) myUserMsg.images = myImages;
+            myMessages.push(myUserMsg);
 
             const myResp = await fetch(`${MY_OLLAMA_BASE}/api/chat`, {
                 method: 'POST',
@@ -5241,7 +5248,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         },
         sd15i2i: { label: 'Stable Diffusion 1.5 img2img (ONNX Runtime Web) — not implemented yet', img2img: true, disabled: true }
     };
-    let myImgState = null, myImgLoadedEngine = '', myImgHistory = [], myImgIndex = -1, myImgBusy = false, myImgStopFlag = false, myImgOriginalBlob = null, myImgNextBase = null; // myImgNextBase: one-shot start picture set by Active to original
+    let myImgState = null, myImgLoadedEngine = '', myImgHistory = [], myImgIndex = -1, myImgBusy = false, myImgStopFlag = false, myImgOriginalBlob = null, myImgFinalBlob = null, myImgNextBase = null; // myImgNextBase: one-shot start picture set by Active to original
     const myImgEl = (myId) => document.getElementById(myId);
     const myImgSetStatus = (myMsg) => { myImgEl('myImgStatus').textContent = myMsg; };
 
@@ -5301,6 +5308,24 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         window.myImgRenderGallery();
         window.myImgShow(myImgHistory.length - 1);
         myImgSetStatus('Starting image set. The next Persistent frame starts from it.');
+    };
+    window.myImgSetFinal = (myInput) => {
+        const myFile = myInput.files && myInput.files[0];
+        if (!myFile) return;
+        myImgFinalBlob = myFile;
+        myImgEl('myImgFinal').src = URL.createObjectURL(myFile);
+        myImgEl('myImgFinal').style.display = 'block';
+        myInput.value = '';
+        myImgSetStatus('Final image set. With "Let the text model suggest each next change" checked, the text model compares the present image with it.');
+    };
+    const myImgToBase64 = async (myBlob) => {
+        const myBmp = await createImageBitmap(myBlob);
+        const myK = Math.min(1, 768 / Math.max(myBmp.width, myBmp.height));
+        const myCanvas = document.createElement('canvas');
+        myCanvas.width = Math.round(myBmp.width * myK); myCanvas.height = Math.round(myBmp.height * myK);
+        myCanvas.getContext('2d').drawImage(myBmp, 0, 0, myCanvas.width, myCanvas.height);
+        myBmp.close();
+        return myCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
     };
     window.myImgShow = (myI) => {
         if (!myImgHistory.length) return;
@@ -5366,17 +5391,23 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         try {
             for (let myN = 0; myN < myCount && !myImgStopFlag; myN++) {
                 let myPrompt = myImgEl('myImgPrompt').value.trim();
+                const myPrev = (myPersistent && myImgNextBase) ? myImgNextBase : (myImgHistory.length ? myImgHistory[myImgHistory.length - 1].blob : myImgOriginalBlob);
                 if (myImgEl('myImgUseLlm').checked && myImgHistory.length) {
                     try {
                         myImgSetStatus('Asking the text model for the next change ...');
-                        const myIdea = await myAgentAskModel('Previous frame prompt:\n' + myPrompt + '\n\nWrite the prompt for the next frame.', myImgEl('myImgInstructions').value);
+                        let myAsk = 'Previous frame prompt:\n' + myPrompt + '\n\nWrite the prompt for the next frame.', myPics = null;
+                        if (myImgFinalBlob && myPrev && myBackendMode === 'webgpu') myImgSetStatus('The WebGPU text engine cannot look at images, so the final image is ignored. Use an Ollama vision model.');
+                        else if (myImgFinalBlob && myPrev) {
+                            myPics = [await myImgToBase64(myPrev), await myImgToBase64(myImgFinalBlob)];
+                            myAsk = 'Image 1 is the PRESENT image. Image 2 is the FINAL image we are heading towards.\n\nCurrent image prompt:\n' + myPrompt + '\n\nCompare the two images. Work out what needs to change in the present image to move one step towards the final image, then write the new image prompt that describes the present image with that change. Reply with the new image prompt only.';
+                        }
+                        const myIdea = await myAgentAskModel(myAsk, myImgEl('myImgInstructions').value, myPics);
                         const myClean = myImgCleanPrompt(myIdea);
                         if (myClean) { myPrompt = myClean; myImgEl('myImgPrompt').value = myPrompt; window.myImgSave(); }
                         else myImgSetStatus('The text model gave no usable prompt, reusing the last one.');
                     } catch (myErr) { myImgSetStatus('Text model unavailable, reusing the prompt: ' + myErr.message); }
                 }
                 const myStart = performance.now();
-                const myPrev = (myPersistent && myImgNextBase) ? myImgNextBase : (myImgHistory.length ? myImgHistory[myImgHistory.length - 1].blob : myImgOriginalBlob);
                 const myFrameNum = myImgHistory.length + 1;
                 const myTick = setInterval(() => {
                     const myMsg = 'Generating frame ' + myFrameNum + ' ... ⏱ ' + ((performance.now() - myStart) / 1000).toFixed(1) + ' s';
