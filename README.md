@@ -19,6 +19,6 @@ Basically uses webGPU or Ollama to load LLM's then gives you Javascript control 
 
 
 
-
+Any you can take the images and generate a video.
 
 https://github.com/user-attachments/assets/81e1b99a-4875-4260-be9d-46bc97fee7a1
