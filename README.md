@@ -17,7 +17,7 @@ Basically uses webGPU or Ollama to load LLM's then gives you Javascript control 
 
 
 
-
+Combining the image generation with the LLM and persistent images using SD Turbo is really interesting.
 
 Any you can take the images and generate a video.
 
