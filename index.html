@@ -917,7 +917,9 @@
                     <li><b>Normal</b>: a new image from the text alone. <b>Persistent</b>: the newest frame is the starting point for the next one, so a sequence changes gradually.</li>
                     <li><b>Change amount</b>: how far the next image may move away from the previous one. Low = small steps, high = big changes. Only used by engines that support image-to-image.</li>
                     <li><b>Let the text model suggest each next change</b>: once a frame or starting image exists, the text model reads the last prompt plus the <b>Instructions</b> box and rewrites the Image prompt box. The Instructions box is permanent: it is never edited and never becomes part of the image prompt.</li>
-                    <li><b>Final image</b>: optional goal picture. With <b>Let the text model suggest each next change</b> checked, the text model looks at the present image and the final image and rewrites the Image prompt box with what needs to change. Needs an Ollama vision model; the WebGPU engine here is text only, so it ignores the final image.</li>
+                    <li><b>Final image</b>: optional goal picture, chosen with its own <b>Choose file</b> button (the file name is shown beside it). With <b>Let the text model suggest each next change</b> checked, the text model looks at the present image and the final image and rewrites the Image prompt box with what needs to change. Needs an Ollama vision model; the WebGPU engine here is text only, so it ignores the final image.
+                        <br><b>Telling the text model how to use the final image:</b> write it in the <b>Instructions</b> box. Each time, the text model is told that Image 1 is the present image and Image 2 is the final image, and your Instructions are sent with it as its standing rules. Example Instructions: <i>Compare the present image with the final image. Change only one thing per frame, the biggest difference first, and move about 10% of the way toward the final image. Keep the subject, lighting and camera angle unless they differ in the final image. Reply with the image prompt only.</i>
+                        <br>Tips: say how big each step should be, say what must stay the same, and say what to ignore. Use a low <b>Change amount</b> so the picture can follow small prompt changes. If the replies describe the images instead of giving a prompt, add "Reply with the image prompt only" to the Instructions.</li>
                     <li><b>Active to original</b> sets the frame you clicked as the original and makes the next Persistent frame start from it. <b>Reset to original</b> adds the original again as the newest frame.</li>
                     <li><b>Reverse frames</b> flips the order of the frames shown (screen, zip and MP4) and does not change how future frames are made. For example: generate younger faces, reverse, then continue from the original to make older ones, and the video runs young to old.</li>
                     <li>Frames can be dragged to reorder (or use ◀ ▶), deleted with ✕, and turned into a video with <b>Make MP4</b> in gallery order.</li>
@@ -970,9 +972,11 @@ Write the changed action in the first sentence, because the image model only rea
             <div class="my-field"><label for="myImgFrames">Frames</label>
                 <input type="number" id="myImgFrames" value="4" min="1" max="200" style="width:80px;" /></div>
             <div class="my-field"><label for="myImgStartFile">Starting image</label>
-                <input type="file" id="myImgStartFile" accept="image/*" onchange="window.myImgSetStart(this)" /></div>
+                <input type="file" id="myImgStartFile" accept="image/*" style="display:none" onchange="window.myImgSetStart(this)" />
+                <div><button class="my-btn my-btn-secondary my-btn-sm" onclick="document.getElementById('myImgStartFile').click()">Choose file</button> <span id="myImgStartName" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);">No file chosen</span></div></div>
             <div class="my-field"><label for="myImgFinalFile">Final image</label>
-                <input type="file" id="myImgFinalFile" accept="image/*" onchange="window.myImgSetFinal(this)" /></div>
+                <input type="file" id="myImgFinalFile" accept="image/*" style="display:none" onchange="window.myImgSetFinal(this)" />
+                <div><button class="my-btn my-btn-secondary my-btn-sm" onclick="document.getElementById('myImgFinalFile').click()">Choose file</button> <span id="myImgFinalName" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);">No file chosen</span></div></div>
             <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);"><input type="checkbox" id="myImgUseLlm" /> Let the text model suggest each next change</label>
         </div>
         <div class="my-btn-row">
@@ -5299,6 +5303,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         const myFile = myInput.files && myInput.files[0];
         if (!myFile) return;
         myImgOriginalBlob = myFile;
+        myImgEl('myImgStartName').textContent = myFile.name;
         myImgEl('myImgOriginal').src = URL.createObjectURL(myFile);
         myImgEl('myImgOriginal').style.display = 'block';
         myInput.value = ''; // so choosing the same file again still works
@@ -5313,6 +5318,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         const myFile = myInput.files && myInput.files[0];
         if (!myFile) return;
         myImgFinalBlob = myFile;
+        myImgEl('myImgFinalName').textContent = myFile.name;
         myImgEl('myImgFinal').src = URL.createObjectURL(myFile);
         myImgEl('myImgFinal').style.display = 'block';
         myInput.value = '';
