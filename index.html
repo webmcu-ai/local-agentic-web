@@ -916,6 +916,8 @@
                 <ul>
                     <li><b>Normal</b>: a new image from the text alone. <b>Persistent</b>: the newest frame is the starting point for the next one, so a sequence changes gradually.</li>
                     <li><b>Change amount</b>: how far the next image may move away from the previous one. Low = small steps, high = big changes. Only used by engines that support image-to-image.</li>
+                    <li><b>Steps</b>: how many denoising steps SD-Turbo runs per image (1 to 4). 1 is the fastest; more steps are slower and can add detail.</li>
+                    <li><b>Move towards the Final image</b>: SD-Turbo only, Persistent mode, needs a Final image. Both pictures are encoded to latents and, during denoising, the working latent is pulled towards the Final image's latent. <b>Target influence</b> is how hard: 0 = off, about 0.1 to 0.3 = gentle (use many frames), 1 = the Final image's latent fully takes over. Repeated frames move the Starting image step by step towards the Final image.</li>
                     <li><b>Let the text model suggest each next change</b>: once a frame or starting image exists, the text model reads the last prompt plus the <b>Instructions</b> box and rewrites the Image prompt box. The Instructions box is permanent: it is never edited and never becomes part of the image prompt.</li>
                     <li><b>Final image</b>: optional goal picture, chosen with its own <b>Choose file</b> button (the file name is shown beside it). With <b>Let the text model suggest each next change</b> checked, the text model looks at the present image and the final image and rewrites the Image prompt box with what needs to change. Needs an Ollama vision model; the WebGPU engine here is text only, so it ignores the final image.
                         <br><b>Telling the text model how to use the final image:</b> write it in the <b>Instructions</b> box. Each time, the text model is told that Image 1 is the present image and Image 2 is the final image, and your Instructions are sent with it as its standing rules. Example Instructions: <i>Compare the present image with the final image. Change only one thing per frame, the biggest difference first, and move about 10% of the way toward the final image. Keep the subject, lighting and camera angle unless they differ in the final image. Reply with the image prompt only.</i>
@@ -969,6 +971,8 @@ Write the changed action in the first sentence, because the image model only rea
                 </select></div>
             <div class="my-field"><label for="myImgStrength">Change amount: <span id="myImgStrengthLabel">0.50</span> <span id="myImgStrengthHint" style="color:var(--text-muted);"></span></label>
                 <input type="range" id="myImgStrength" min="0.1" max="1" step="0.05" value="0.5" oninput="document.getElementById('myImgStrengthLabel').textContent=parseFloat(this.value).toFixed(2)" /></div>
+            <div class="my-field"><label for="myImgSteps">Steps: <span id="myImgStepsLabel">1</span></label>
+                <input type="range" id="myImgSteps" min="1" max="4" step="1" value="1" oninput="document.getElementById('myImgStepsLabel').textContent=this.value" /></div>
             <div class="my-field"><label for="myImgFrames">Frames</label>
                 <input type="number" id="myImgFrames" value="4" min="1" max="200" style="width:80px;" /></div>
             <div class="my-field"><label for="myImgStartFile">Starting image</label>
@@ -978,6 +982,9 @@ Write the changed action in the first sentence, because the image model only rea
                 <input type="file" id="myImgFinalFile" accept="image/*" style="display:none" onchange="window.myImgSetFinal(this)" />
                 <div><button class="my-btn my-btn-secondary my-btn-sm" onclick="document.getElementById('myImgFinalFile').click()">Choose file</button> <span id="myImgFinalName" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);">No file chosen</span></div></div>
             <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);"><input type="checkbox" id="myImgUseLlm" /> Let the text model suggest each next change</label>
+            <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);"><input type="checkbox" id="myImgTargetOn" /> Move towards the Final image (latent, SD-Turbo, Persistent mode)</label>
+            <div class="my-field"><label for="myImgTargetInfluence">Target influence: <span id="myImgTargetInfluenceLabel">0.15</span></label>
+                <input type="range" id="myImgTargetInfluence" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('myImgTargetInfluenceLabel').textContent=parseFloat(this.value).toFixed(2)" /></div>
         </div>
         <div class="my-btn-row">
             <button class="my-btn my-btn-primary" onclick="window.myImgRun(1)">Generate / Next frame</button>
@@ -5093,6 +5100,22 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         for (let myI = 0; myI <= myT; myI++) myC *= 1 - Math.pow(myA + (myB - myA) * myI / 999, 2);
         return Math.sqrt((1 - myC) / myC);
     };
+    // Scheduler: the list of timesteps for myCount steps, from myStartT down towards 0 (1 step = [myStartT], 4 steps from 999 = 999, 749, 500, 250).
+    const mySdTimesteps = (myStartT, myCount) => {
+        const myList = [];
+        for (let myK = 0; myK < myCount; myK++) myList.push(Math.max(1, Math.round(myStartT * (myCount - myK) / myCount)));
+        return myList;
+    };
+    // Final image -> latent, encoded once per picture with the same encoder, size and scaling as the starting latent.
+    const myGetTargetLatent = async (myState, myBlob) => {
+        if (myState.myTargetBlob === myBlob && myState.myTargetLat) return myState.myTargetLat;
+        if (!myState.mySessions.vaeEncoder) throw new Error('The VAE encoder did not load.');
+        const myLatent = await myEncodeImage(myState.mySessions.vaeEncoder, await myImgToPixels(myBlob));
+        if (myLatent.length !== 4 * 64 * 64) throw new Error('The Final image latent has the wrong size (' + myLatent.length + ').');
+        myState.myTargetBlob = myBlob; myState.myTargetLat = myLatent;
+        return myLatent;
+    };
+    const myDisposeTensor = (myTensor) => { try { if (myTensor && myTensor.dispose) myTensor.dispose(); } catch (e) {} };
     const myToHalf = (myF32) => {
         const myOut = new Uint16Array(myF32.length), myF = new Float32Array(1), myU = new Uint32Array(myF.buffer);
         for (let myI = 0; myI < myF32.length; myI++) {
@@ -5236,16 +5259,48 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                     myBaseLat = await myEncodeImage(mySess.vaeEncoder, await myImgToPixels(myOpts.initImage));
                     myT = Math.max(1, Math.min(999, Math.round(999 * myOpts.strength)));
                 }
-                const mySigma = mySdSigma(myT), myNoise = myRandn(myBaseLat.length), myLat = new Float32Array(myBaseLat.length);
+                const mySteps = Math.max(1, Math.min(4, parseInt(myOpts.steps, 10) || 1)), myTimesteps = mySdTimesteps(myT, mySteps);
+                myT = myTimesteps[0];
+                let mySigma = mySdSigma(myT), myNoise = myRandn(myBaseLat.length), myLat = new Float32Array(myBaseLat.length);
                 for (let myI = 0; myI < myLat.length; myI++) myLat[myI] = myBaseLat[myI] + myNoise[myI] * mySigma;
-                const myScale = 1 / Math.sqrt(mySigma * mySigma + 1);
-                const myUnetOut = await mySess.unet.run({
-                    sample: new ort.Tensor('float32', myLat.map((myV) => myV * myScale), [1, 4, 64, 64]),
-                    timestep: new ort.Tensor('int64', BigInt64Array.from([BigInt(myT)]), [1]),
-                    encoder_hidden_states: myEnc.last_hidden_state
-                });
-                const myEps = myUnetOut.out_sample.data, myDen = new Float32Array(myLat.length);
-                for (let myI = 0; myI < myDen.length; myI++) myDen[myI] = (myLat[myI] - mySigma * myEps[myI]) / 0.18215;
+                let myDen = new Float32Array(myLat.length);
+                let myTargetLat = null;
+                const myInfluence = Math.max(0, Math.min(1, parseFloat(myOpts.targetInfluence) || 0));
+                if (myOpts.targetImage && myOpts.initImage && myInfluence > 0) {
+                    try { myTargetLat = await myGetTargetLatent(myState, myOpts.targetImage); }
+                    catch (myErr) { console.warn('Final image encoding failed, continuing without it:', myErr); myState.myNote = 'Final image not used: ' + myErr.message; }
+                }
+                for (let myStep = 0; myStep < mySteps; myStep++) {
+                    myT = myTimesteps[myStep];
+                    mySigma = mySdSigma(myT);
+                    const myScale = 1 / Math.sqrt(mySigma * mySigma + 1);
+                    const myUnetOut = await mySess.unet.run({
+                        sample: new ort.Tensor('float32', myLat.map((myV) => myV * myScale), [1, 4, 64, 64]),
+                        timestep: new ort.Tensor('int64', BigInt64Array.from([BigInt(myT)]), [1]),
+                        encoder_hidden_states: myEnc.last_hidden_state
+                    });
+                    const myEps = myUnetOut.out_sample.data;
+                    for (let myI = 0; myI < myDen.length; myI++) myDen[myI] = (myLat[myI] - mySigma * myEps[myI]) / 0.18215;
+                    const myEpsGuided = myTargetLat ? new Float32Array(myEps.length) : myEps;
+                    if (myTargetLat) {
+                        // Pull the denoised estimate towards the target latent; the pull grows with each step. Then recompute the noise estimate so the scheduler sees a consistent latent.
+                        const myWeight = myInfluence * (myStep + 1) / mySteps;
+                        for (let myI = 0; myI < myDen.length; myI++) {
+                            const myX0 = (1 - myWeight) * (myDen[myI] * 0.18215) + myWeight * myTargetLat[myI];
+                            myDen[myI] = myX0 / 0.18215;
+                            myEpsGuided[myI] = (myLat[myI] - myX0) / mySigma;
+                        }
+                    }
+                    if (myStep < mySteps - 1) {
+                        // Euler ancestral step to the next noise level
+                        const myNextSigma = mySdSigma(myTimesteps[myStep + 1]);
+                        const myUp = Math.sqrt(myNextSigma * myNextSigma * (mySigma * mySigma - myNextSigma * myNextSigma) / (mySigma * mySigma));
+                        const myDown = Math.sqrt(myNextSigma * myNextSigma - myUp * myUp);
+                        myNoise = myRandn(myLat.length);
+                        for (let myI = 0; myI < myLat.length; myI++) myLat[myI] = myLat[myI] + myEpsGuided[myI] * (myDown - mySigma) + myNoise[myI] * myUp;
+                    }
+                    myDisposeTensor(myUnetOut.out_sample);
+                }
                 const myVae = await mySess.vaeDecoder.run({ latent_sample: new ort.Tensor('float32', myDen, [1, 4, 64, 64]) });
                 return await myImgPixelsToBlob(myVae.sample.data);
             }
@@ -5264,6 +5319,8 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         const myEng = myImgEngines[myImgEl('myImgEngineSelect').value];
         const myPersistent = myImgEl('myImgMode').value === 'persistent';
         myImgEl('myImgStrength').disabled = !(myEng && myEng.img2img);
+        myImgEl('myImgSteps').disabled = !(myEng && myEng.img2img);
+        myImgEl('myImgTargetInfluence').disabled = !(myEng && myEng.img2img);
         myImgEl('myImgStrengthHint').textContent = (myEng && myEng.img2img) ? '' : '(inactive: this engine has no img2img)';
         if (myPersistent && myEng && !myEng.img2img) myImgSetStatus('This engine cannot use the previous image to generate the next one. Use Normal mode, or an engine marked img2img.');
     };
@@ -5393,6 +5450,12 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         if (!myImgState || myImgLoadedEngine !== myKey) { myImgSetStatus('Load the image model first.'); return; }
         const myPersistent = myImgEl('myImgMode').value === 'persistent';
         if (myPersistent && !myEng.img2img) { window.myImgUpdateControls(); return; }
+        const myTargetOn = myImgEl('myImgTargetOn').checked;
+        if (myTargetOn && myKey !== 'sdturbo') { myImgSetStatus('Move towards the Final image only works with the SD-Turbo engine.'); return; }
+        if (myTargetOn && !myPersistent) { myImgSetStatus('Move towards the Final image needs Persistent mode (it starts from the previous image).'); return; }
+        if (myTargetOn && !myImgFinalBlob) { myImgSetStatus('Choose a Final image first, or untick Move towards the Final image.'); return; }
+        if (myTargetOn && !myImgState.mySessions.vaeEncoder) { myImgSetStatus('The VAE encoder did not load, so the Final image cannot be used. See the browser console.'); return; }
+        myImgState.myNote = '';
         myImgBusy = true; myImgStopFlag = false;
         try {
             for (let myN = 0; myN < myCount && !myImgStopFlag; myN++) {
@@ -5421,14 +5484,14 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
                 }, 100);
                 let myBlob;
                 try {
-                    myBlob = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value) });
+                    myBlob = await myEng.generate(myImgState, { prompt: myPrompt, initImage: myPersistent ? myPrev : null, strength: parseFloat(myImgEl('myImgStrength').value), steps: parseInt(myImgEl('myImgSteps').value, 10) || 1, targetImage: myTargetOn ? myImgFinalBlob : null, targetInfluence: parseFloat(myImgEl('myImgTargetInfluence').value) });
                 } finally { clearInterval(myTick); }
                 if (myPersistent) myImgNextBase = null; // used once; later frames build on the newest frame
                 myImgHistory.push({ blob: myBlob, url: URL.createObjectURL(myBlob), ms: performance.now() - myStart, prompt: myPrompt });
                 window.myImgRenderGallery();
                 window.myImgShow(myImgHistory.length - 1);
             }
-            myImgSetStatus(myImgStopFlag ? 'Stopped.' : 'Done.');
+            myImgSetStatus((myImgStopFlag ? 'Stopped.' : 'Done.') + (myImgState && myImgState.myNote ? ' ' + myImgState.myNote : ''));
         } catch (myErr) {
             myImgSetStatus('Generation error: ' + myErr.message);
         }
