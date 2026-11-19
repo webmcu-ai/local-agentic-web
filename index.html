@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v035</title>
+<title>Ollama Local AI + Agent — v040</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -692,7 +692,7 @@
             <div class="my-setup-step">
                 <div class="my-step-num">4</div>
                 <div class="my-step-text">
-                    After rebooting, wait for Ollama to start and show its icon in the system tray (Windows) or menu bar (Mac). Then load the installed PWA. Return here — the status pill top-right will turn green when connected.
+                    After rebooting, wait for Ollama to start and show its icon in the system tray (Windows) or menu bar (Mac). Then reload this page. The status pill top-right turns green when Ollama is found.
                 </div>
             </div>
             <div class="my-setup-step">
@@ -902,35 +902,46 @@
 <div class="my-config-panel" id="myImgPanel">
     <div class="my-collapsible-toggle" onclick="window.myImgToggle()"><span>🖼 Image generation (browser, WebGPU)</span></div>
     <div class="my-collapsible-body" id="myImgBody">
-        <details class="my-help"><summary>ℹ Help: how image generation works</summary>
+        <details class="my-help"><summary>ℹ Help: image generation (quick start and tips)</summary>
             <div class="my-help-body">
-                <h4>Workflow</h4>
+                <h4>Demo 1: one realistic photo (about 2 minutes)</h4>
                 <ol>
-                    <li>Pick an image model and engine, then click <b>Load image model</b>. Image models load separately from the text model above.</li>
-                    <li>Write the <b>Image prompt</b>: what should appear in the picture.</li>
-                    <li>Choose <b>Normal</b> or <b>Persistent</b> mode.</li>
-                    <li>Persistent only: give it a picture to start from (<b>Starting image</b>, an earlier frame, or click a frame and press <b>Active to original</b>).</li>
-                    <li><b>Generate / Next frame</b> makes one image. <b>Continuous generate</b> makes <b>Frames</b> images in a row (1 to 200).</li>
+                    <li>Leave the model as <b>Janus-Pro</b> and click <b>Load image model</b> (the first time it downloads about 2.4 GB, then it is cached).</li>
+                    <li>Leave the Image prompt as it is and click <b>Generate / Next frame</b>.</li>
+                    <li>Change the words in the prompt and generate again.</li>
                 </ol>
-                <h4>Controls</h4>
+                <h4>Demo 2: a short sequence (a slow "movie")</h4>
+                <ol>
+                    <li>Pick <b>SD-Turbo</b> in the suggested models list and click <b>Load image model</b> (about 2.6 GB, faster than Janus).</li>
+                    <li>Mode <b>Normal</b>: click <b>Generate / Next frame</b> once to make the first picture.</li>
+                    <li>Switch Mode to <b>Persistent</b>, change one small thing in the prompt (for example "head turned slightly left"), set <b>Frames</b> to 4 and click <b>Continuous generate</b>.</li>
+                    <li>Each new frame starts from the previous one. Click <b>Make MP4</b> to turn the frames into a video.</li>
+                </ol>
+                <h4>How to get high quality, realistic images</h4>
                 <ul>
-                    <li><b>Normal</b>: a new image from the text alone. <b>Persistent</b>: the newest frame is the starting point for the next one, so a sequence changes gradually.</li>
-                    <li><b>Change amount</b>: how far the next image may move away from the previous one. Low = small steps, high = big changes. Only used by engines that support image-to-image.</li>
-                    <li><b>Steps</b>: how many denoising steps SD-Turbo runs per image (1 to 4). 1 is the fastest; more steps are slower and can add detail.</li>
-                    <li><b>Move towards the Final image</b>: SD-Turbo only, Persistent mode, needs a Final image. Both pictures are encoded to latents and, during denoising, the working latent is pulled towards the Final image's latent. <b>Target influence</b> is how hard: 0 = off, about 0.1 to 0.3 = gentle (use many frames), 1 = the Final image's latent fully takes over. Repeated frames move the Starting image step by step towards the Final image.</li>
-                    <li><b>Let the text model suggest each next change</b>: once a frame or starting image exists, the text model reads the last prompt plus the <b>Instructions</b> box and rewrites the Image prompt box. The Instructions box is permanent: it is never edited and never becomes part of the image prompt.</li>
-                    <li><b>Final image</b>: optional goal picture, chosen with its own <b>Choose file</b> button (the file name is shown beside it). With <b>Let the text model suggest each next change</b> checked, the text model looks at the present image and the final image and rewrites the Image prompt box with what needs to change. Needs an Ollama vision model; the WebGPU engine here is text only, so it ignores the final image.
-                        <br><b>Telling the text model how to use the final image:</b> write it in the <b>Instructions</b> box. Each time, the text model is told that Image 1 is the present image and Image 2 is the final image, and your Instructions are sent with it as its standing rules. Example Instructions: <i>Compare the present image with the final image. Change only one thing per frame, the biggest difference first, and move about 10% of the way toward the final image. Keep the subject, lighting and camera angle unless they differ in the final image. Reply with the image prompt only.</i>
-                        <br>Tips: say how big each step should be, say what must stay the same, and say what to ignore. Use a low <b>Change amount</b> so the picture can follow small prompt changes. If the replies describe the images instead of giving a prompt, add "Reply with the image prompt only" to the Instructions.</li>
-                    <li><b>Active to original</b> sets the frame you clicked as the original and makes the next Persistent frame start from it. <b>Reset to original</b> adds the original again as the newest frame.</li>
-                    <li><b>Reverse frames</b> flips the order of the frames shown (screen, zip and MP4) and does not change how future frames are made. For example: generate younger faces, reverse, then continue from the original to make older ones, and the video runs young to old.</li>
-                    <li>Frames can be dragged to reorder (or use ◀ ▶), deleted with ✕, and turned into a video with <b>Make MP4</b> in gallery order.</li>
+                    <li>Start the prompt with <code>A photorealistic photo of</code>, then name the subject, the place and the light.</li>
+                    <li>Add camera words at the end: <code>sharp focus, natural light, detailed, shot on a DSLR, 85mm lens, shallow depth of field, high quality</code>.</li>
+                    <li>Avoid words that pull the style away from a photo: painting, drawing, illustration, cartoon, 3D render, anime.</li>
+                    <li>Keep it short. SD-Turbo only reads the first ~75 tokens (about 55 words), so put the most important words first. Janus-Pro reads the whole prompt.</li>
+                    <li>There is no negative prompt box on this page. Say what you want instead of what you do not want.</li>
+                    <li>For people, ask for a close-up or portrait. Small faces in a wide scene come out poorly at 512x512.</li>
+                    <li>SD-Turbo <b>Steps</b>: 1 is fastest; 2 to 4 are slower and often add detail.</li>
                 </ul>
-                <h4>Model differences</h4>
+                <span class="my-help-ex">A photorealistic photo of an old fisherman on a wooden boat at dawn, calm sea, soft golden light, sharp focus, detailed skin, shot on a DSLR with an 85mm lens, high quality.</span>
+                <h4>Controls in plain words</h4>
                 <ul>
-                    <li><b>Janus-Pro</b>: reads the whole prompt, text-to-image only (no Persistent mode).</li>
-                    <li><b>SD-Turbo</b>: reads only the first ~75 tokens (about 55 words), supports Persistent. Put the part that changes at the start of the prompt.</li>
+                    <li><b>Normal</b>: every image is made from the text alone. <b>Persistent</b>: the newest frame is the starting point for the next one (SD-Turbo only).</li>
+                    <li><b>Change amount</b>: low = small steps between frames, high = big changes.</li>
+                    <li><b>Starting image</b>: a picture of your own to begin from in Persistent mode. <b>Reset to original</b> adds it again; <b>Active to original</b> makes the frame you clicked the new original.</li>
+                    <li><b>Reverse frames</b> flips the order of the frames shown (and the zip and MP4). Frames can also be dragged to reorder or deleted with ✕.</li>
                 </ul>
+                <h4>Advanced (optional)</h4>
+                <ul>
+                    <li><b>Let the text model suggest each next change</b>: after the first frame, the text model reads the last prompt plus the <b>Instructions</b> box and rewrites the Image prompt box. The Instructions box is never changed and never becomes part of the image prompt. The default Instructions keep every frame photorealistic and change one small thing each time.</li>
+                    <li><b>Final image</b> and <b>Move towards the Final image</b> (SD-Turbo, Persistent): choose a goal picture. <b>Target influence</b> 0 = off, 0.1 to 0.3 = gentle (use many frames), 1 = the goal fully takes over. With the text-model checkbox on and an <b>Ollama vision model</b>, the text model also compares the present image with the final image and writes the next prompt. The WebGPU text engine cannot see pictures, so it ignores the final image.</li>
+                </ul>
+                <span class="my-help-ex">Compare the present image with the final image. Change one thing per frame, the biggest difference first. Keep it photorealistic. Reply with the image prompt only.</span>
+                <p class="my-help-note">Your last prompt and Instructions are remembered by the browser, so a new version of this page may still show your old text. Delete the text and reload to see the new defaults.</p>
             </div>
         </details>
         <div class="my-config-row">
@@ -953,15 +964,14 @@
         <div id="myImgStatus" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px;">Not loaded.</div>
         <div class="my-field my-field-full">
             <label for="myImgPrompt">Image prompt (the text model rewrites this box each frame when the checkbox below is ticked)</label>
-            <textarea id="myImgPrompt" rows="5" oninput="window.myImgSave()" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">Golden hour portrait of an exceptionally healthy, joyful golden retriever puppy sitting in a dewy green meadow, looking directly into the camera with expressive, bright eyes and a cheerful open-mouthed expression. Soft sunrise light streams from the left, casting a warm golden glow across its fluffy fur and catching tiny rim-lighting highlights along its ears. Soft-focus background with lush green grass and distant rolling hills bathed in gentle morning mist, deep shallow depth of field, dramatic bokeh effect, cinematic lighting, 8k resolution, highly detailed photorealism.</textarea>
-            <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:3px;">SD-Turbo only reads the first ~75 tokens (about 55 words); words after that are ignored. Janus-Pro reads the whole prompt.</div>
+            <textarea id="myImgPrompt" rows="5" oninput="window.myImgSave()" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">A photorealistic photo of a golden retriever puppy sitting on green grass at sunrise, looking at the camera. Warm natural light from the left, sharp focus, detailed fur, shallow depth of field, shot on a DSLR with an 85mm lens, high quality.</textarea>
+            <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:3px;">For realistic photos start with "A photorealistic photo of" and end with camera words (sharp focus, natural light, DSLR). SD-Turbo only reads the first ~55 words; Janus-Pro reads the whole prompt.</div>
         </div>
         <div class="my-field my-field-full" style="margin-top:8px;">
             <label for="myImgInstructions">Instructions for the text model (permanent: never changed, never shown in the image prompt, only used when the checkbox below is ticked)</label>
-            <textarea id="myImgInstructions" rows="5" oninput="window.myImgSave()" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">You are writing the image prompts for a continuous image sequence, one prompt per frame. Each time, I give you the previous frame's prompt. Reply with the next frame's prompt ONLY: one paragraph, no quotes, no title, no explanation.
-Keep all scene variables constant, word for word: [Subject ID], [Environment], [Lighting: sunrise from the left], [Depth of Field] and the style words (cinematic, 8k, photorealism).
-Modify ONLY the [Action Delta] (the subject's pose, head angle, expression, ears or paws) by one tiny micro-increment, like the next frame of a slow smooth movie. Never jump to a new pose.
-Write the changed action in the first sentence, because the image model only reads the first 75 or so tokens.</textarea>
+            <textarea id="myImgInstructions" rows="5" oninput="window.myImgSave()" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">You write the image prompt for each frame of a short photo sequence. I give you the previous frame's prompt. Reply with the next prompt ONLY: one short paragraph, under 50 words, no quotes, no title, no explanation.
+Always start with "A photorealistic photo of" and keep the same subject, place and light in every prompt. End every prompt with: sharp focus, natural light, detailed, shot on a DSLR, high quality. Never use the words painting, drawing, illustration, cartoon, 3D render or anime.
+Change only ONE small thing (the pose, head angle or expression) by a tiny step, like the next frame of a slow video. Write that change in the first sentence.</textarea>
         </div>
         <div class="my-config-row" style="margin-top:8px;">
             <div class="my-field"><label for="myImgMode">Mode</label>
@@ -1183,94 +1193,70 @@ Write the changed action in the first sentence, because the image model only rea
     <div class="my-tools-body" id="myAgentPanelBody">
 
         <div>
-            <details class="my-help"><summary>ℹ Help: keyword reference (variables, markers, modes)</summary>
+            <details class="my-help"><summary>ℹ Help: how the Folder Agent works, demos, and connecting other programs</summary>
                 <div class="my-help-body">
-                    <p>Only the <code>${...}</code> variables and the <code>=== FILE: name ===</code> marker are real syntax. Words like READ or IMPROVE in a prompt are ordinary English the model interprets. Variables are filled in when the folder agent runs Classic mode; Create and Improve use their own built-in prompts. More detail is in the Help below.</p>
-                    <h4>File variables (use in the base prompt)</h4>
+                    <h4>What it is</h4>
+                    <p>The Folder Agent watches one folder on your computer. It reads text files that end in <code>.in.txt</code>, sends each one to your model (Ollama or the WebGPU engine chosen at the top), and writes the answer next to it as <code>.out.txt</code>. After you pick the folder once, it needs no more clicks. Reloading the page needs one click to re-allow the folder (a browser rule).</p>
+                    <h4>Demo 1: summarize a text (2 minutes)</h4>
+                    <ol>
+                        <li>Click <b>Select / Create Agent Folder</b> and pick (or create) an empty folder such as <code>agent-demo</code>. Chrome will not share Documents, Desktop or Downloads themselves, so use a folder inside them.</li>
+                        <li>In the file browser type <code>hello.in.txt</code> and click <b>+ Create File</b>, click <b>Edit</b> on it, paste a paragraph of text, click <b>Save Changes</b>.</li>
+                        <li>Leave <b>Classic</b> mode and the default prompt, untick <b>Auto-chain</b>, and click <b>Run Once</b>.</li>
+                        <li>Click <b>Refresh File List</b>: <code>hello.out.txt</code> now holds the answer.</li>
+                    </ol>
+                    <h4>Demo 2: build a small web page, one file per pass</h4>
+                    <ol>
+                        <li>Use an empty agent folder. Create <code>webpage.in.txt</code> containing, for example: <i>A simple to-do list web page with an input box, an Add button and a list.</i></li>
+                        <li>Click <b>Load web-page project example</b> (it sets the prompt and turns on Multi-file output).</li>
+                        <li>Tick <b>Auto-chain</b>, set <b>Max auto-chain iterations</b> to 4, and click <b>Start Watch Loop</b>.</li>
+                        <li>Each pass adds one new file (index.html, then style.css, then script.js, then README.md). Click <b>Stop Watch Loop</b> when done and open <code>index.html</code>.</li>
+                    </ol>
+                    <h4>Demo 3: improve an existing project</h4>
+                    <ol>
+                        <li>Copy a small project (a few html, css and js files) into the agent folder.</li>
+                        <li>Create <code>goal.in.txt</code> containing, for example: <i>Make the page work better on phones and fix any bugs.</i></li>
+                        <li>Choose <b>Improve</b> mode and click <b>Run Once</b>. Your originals are not touched: the improved copy goes to <code>goal-project/</code> and the pre-change copies to <code>goal-backup/</code>.</li>
+                    </ol>
+                    <h4>Connecting it to other sites and programs</h4>
+                    <p>The page never reaches out to other websites. The <b>folder is the connection point</b>: any program that can read and write files in the same folder can talk to the agent. That works even with no internet, because the "other site" can simply be another program or web page on the same computer.</p>
                     <ul>
-                        <li><code>${input}</code> content of the current input file</li>
-                        <li><code>${filename}</code> name of the current file</li>
-                        <li><code>${iteration}</code> current pass number (1, 2, 3 ...)</li>
-                        <li><code>${original}</code> the input as it was before auto-chain started overwriting it</li>
-                        <li><code>${manifest}</code> list of files already created for this job</li>
-                        <li><code>${sensor1}</code> example: any other <code>${name}</code> inserts the contents of <code>name.in.txt</code> (or <code>name.txt</code>) from the folder; missing files give empty text</li>
+                        <li><b>A script on your computer</b> (Python, Node, a data logger) writes <code>reading-001.in.txt</code> into the folder and later reads <code>reading-001.out.txt</code>.</li>
+                        <li><b>Another web page on your computer</b> (opened from a local server or from a file) can do the same: it asks you to pick the same folder with its own folder picker, then writes <code>.in.txt</code> files and reads <code>.out.txt</code> files.</li>
+                        <li><b>A phone or another computer</b>: put the agent folder inside a synced folder (OneDrive, Dropbox, Google Drive for desktop, Syncthing). Files that arrive from the other device are picked up like any other file.</li>
+                        <li><b>Another AI chat site</b>: use the Output Tools below to copy a response and open the site. That part is copy and paste, not automatic.</li>
                     </ul>
-                    <h4>Copyable examples</h4>
-                    <div>READ</div><span class="my-help-ex">Read and summarize ${input}.</span>
-                    <div>PRESERVE</div><span class="my-help-ex">Keep the original requirements in ${original}.</span>
-                    <div>ITERATE</div><span class="my-help-ex">Improve the current result using ${iteration} to track the current pass.</span>
-                    <div>ADD FILES</div><span class="my-help-ex">Check ${manifest} before creating files. Do not recreate files that already exist. Add one useful new file.</span>
-                    <div>MULTIPLE INPUTS</div><span class="my-help-ex">Compare ${sensor1} with ${sensor2} and explain the differences.</span>
-                    <h4>Multi-file output marker</h4>
+                    <p>A tiny Python example that sends one job and waits for the answer (change the folder path first):</p>
+                    <span class="my-help-ex">import time, pathlib
+myFolder = pathlib.Path(r"C:\agent-demo")
+(myFolder / "reading-001.in.txt").write_text("Summarize: the temperature rose from 20 C to 25 C in one hour.")
+while not (myFolder / "reading-001.out.txt").exists():
+    time.sleep(1)
+print((myFolder / "reading-001.out.txt").read_text())</span>
+                    <p class="my-help-note">Use a new file name for each new job (reading-002.in.txt and so on). The agent runs each file name up to the Max iterations setting until the page is reloaded. Keep the Watch Loop running while the other program works.</p>
+                    <h4>Prompt variables (use them in the base prompt)</h4>
+                    <ul>
+                        <li><code>${input}</code> the text of the current file, <code>${filename}</code> its name, <code>${iteration}</code> the pass number (1, 2, 3 ...)</li>
+                        <li><code>${original}</code> the input as it was before Auto-chain started overwriting it</li>
+                        <li><code>${manifest}</code> the list of files already created for this job</li>
+                        <li><code>${sensor1}</code> and any other <code>${name}</code> inserts the text of <code>name.in.txt</code> (or <code>name.txt</code>) from the same folder. A missing file gives empty text.</li>
+                    </ul>
+                    <span class="my-help-ex">Compare ${sensor1} with ${sensor2} and explain the differences in two sentences.</span>
+                    <h4>Multi-file output</h4>
+                    <p>Tick <b>Multi-file output</b> and tell the model to answer in this format. Subfolders such as <code>css/style.css</code> are created for you:</p>
                     <span class="my-help-ex">=== FILE: index.html ===
 ...
-=== FILE: script.js ===
-...
-=== FILE: README.md ===
-...</span>
-                    <p>Each marker line starts a separate file. The <b>Multi-file output</b> checkbox only turns on the parsing: your prompt must still tell the model to answer in this format.</p>
-                    <h4>Operating modes</h4>
-                    <ul>
-                        <li><b>Classic</b>: runs your base prompt on each input.</li>
-                        <li><b>Create</b>: plans, generates, reviews and corrects a new project from the input text.</li>
-                        <li><b>Improve</b>: inspects existing files, audits, ranks improvements, implements and verifies them (works on a copy; originals are kept).</li>
-                    </ul>
-                    <h4>Auto-chain</h4>
-                    <p>Repeats the job up to <b>Max auto-chain iterations</b>. Classic single-file: the output replaces the input for the next pass. Classic multi-file: the input is left alone and progress is tracked with <code>${manifest}</code> and <code>${iteration}</code>. Create: later passes switch to Improve on the new project. Improve: repeats the cycle and stops early when nothing worthwhile is left.</p>
-                    <p class="my-help-note">The Agent folder and the Coding Agent's coding folder are separate choices. Use different folders so their files do not mix.</p>
-                </div>
-            </details>
-
-            <details style="margin-bottom: 12px;">
-                <summary style="cursor:pointer; font-size:0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">Help: how this panel works, multi-file output, file variables</summary>
-                <div style="margin-top: 8px;">
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 10px;">
-                "Select / Create Agent Folder" needs one click (browser security requirement for
-                <code>showDirectoryPicker</code>). After that, everything below — reading files,
-                calling Ollama, writing outputs, chaining passes — runs with <b>no further clicks</b>,
-                driven by an interval loop. Reloading the page will require one more click to
-                re-confirm folder permission; that's a browser-enforced limit, not something
-                JavaScript can route around. Each request goes through whichever backend is selected
-                top-right — the local Ollama server at <code>http://localhost:11434</code>, or the
-                in-browser WebGPU engine once it's compiled — using the Model / System Prompt set above.
-            </div>
-                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
-                    When checked, the model's response is scanned for markers like this and each block is written to
-                    its own file (subfolders like <code>css/style.css</code> are created automatically):
-                    <pre style="background:var(--bg-base); border:1px solid var(--border); border-radius: var(--radius); padding:6px 8px; margin:6px 0; white-space:pre-wrap; color: var(--accent-blue);">=== FILE: index.html ===
-&lt;!DOCTYPE html&gt;...
-
 === FILE: css/style.css ===
-body { ... }
-
-=== FILE: script.js ===
-console.log("hi");</pre>
-                    Your base prompt below needs to actually instruct the model to respond in this format — the
-                    toggle only controls how the response gets <i>parsed</i>, it doesn't change what the model writes.
-                    If no markers are found in a response, it falls back to writing the whole thing as one file.
-                    The three names above are just an <i>example</i> of the marker syntax — the parser doesn't care
-                    what the names are or how many files there are. If you want the model to invent its own filenames
-                    and file count, say so explicitly in the base prompt; it won't do that on its own just because the
-                    toggle is checked. Click "Load creative example" below for a starter prompt written that way.
-                </div>
-                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5;">
-                <b style="color:var(--text-secondary);">File variables:</b> write <code>${input}</code>, <code>${filename}</code>,
-                <code>${iteration}</code>, <code>${original}</code>, or <code>${manifest}</code> anywhere in the prompt above
-                to reference the file currently being processed. Any other <code>${name}</code> is looked up against the
-                other files sitting in the folder right now — e.g. <code>${sensor1}</code> pulls in the live content of
-                <code>sensor1.in.txt</code>.
-                <br><b style="color:var(--text-secondary);">${original}</b> is special: on first processing, each job's starting
-                content is snapshotted once to <code>&lt;name&gt;.backup.input.txt</code> (never overwritten again). <code>${original}</code>
-                always resolves to that snapshot, so even after many auto-chain passes have overwritten the live
-                <code>.in.txt</code> file, the model can still see what it was originally asked to do —
-                e.g. <code>Original request: ${original}\nLatest draft: ${input}\nImprove the draft while staying true to the original request.</code>
-                <br><b style="color:var(--text-secondary);">${manifest}</b> is for additive multi-file chains ("make one more file
-                each pass"): it lists every file this job has written so far (<code>&lt;name&gt;.manifest.txt</code>), so the model
-                can be told what already exists and add something new instead of re-generating or overwriting it. When multi-file
-                output + auto-chain are both on, the live <code>.in.txt</code> is deliberately left untouched pass to pass (see the
-                "Load Creative Multi-File Example" button) — progress is tracked via <code>${manifest}</code> +
-                <code>${iteration}</code> instead of mutating the input.
-            </div>
+...
+=== FILE: js/app.js ===
+...</span>
+                    <h4>Modes and Auto-chain</h4>
+                    <ul>
+                        <li><b>Classic</b>: your base prompt is run on each input file.</li>
+                        <li><b>Create</b>: plans, writes, reviews and fixes a new project from the request in the input file.</li>
+                        <li><b>Improve</b>: inspects existing files, finds and ranks problems, fixes them and checks the result.</li>
+                        <li><b>Auto-chain</b> repeats the job up to the Max iterations. Classic with one output file replaces the input with the result each pass; multi-file output leaves the input alone and uses <code>${manifest}</code> and <code>${iteration}</code> to track progress.</li>
+                    </ul>
+                    <p class="my-help-note">The Agent folder and the Coding Agent's folder are separate choices. Use different folders so their files do not mix.</p>
                 </div>
             </details>
 
@@ -1315,13 +1301,13 @@ console.log("hi");</pre>
                     Multi-file output: split the response into several named files instead of writing it as one file
                 </label>
                 <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
-                    Your prompt must tell the model to answer with "=== FILE: name ===" markers. See Help above.
+                    Your prompt must tell the model to answer with "=== FILE: name ===" markers. See the Help above.
                 </div>
             </div>
             <div class="my-section-label" style="margin-top:14px;">Operating mode</div>
             <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px; font-family: var(--font-mono);">
                 <select id="myAgentModeSelect" onchange="window.myUpdatePipelineModeUI()" aria-label="Folder agent operating mode" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
-                    <option value="classic">Classic: run my base prompt on each input (v016 behavior)</option>
+                    <option value="classic">Classic: run my base prompt on each input</option>
                     <option value="create">Create Mode: plan, generate, review, correct, report</option>
                     <option value="improve">Improve Mode: inspect, audit, rank, implement, review, verify, report</option>
                 </select>
@@ -1332,19 +1318,19 @@ console.log("hi");</pre>
             <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px; display:flex; align-items:center; gap:20px; flex-wrap:wrap; font-family: var(--font-mono);">
                 <span style="display:flex; align-items:center; gap:8px;">
                     Max auto-chain iterations (same file):
-                    <input type="number" id="myMaxGenerationsInput" value="5" min="1" max="50"
+                    <input type="number" id="myMaxGenerationsInput" value="4" min="1" max="50"
                            style="width: 70px; padding: 4px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); font-family: var(--font-mono); border-radius: var(--radius);">
                 </span>
                 <span style="display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" id="myAutoChainToggle" checked style="cursor:pointer; accent-color: var(--accent-green);">
+                    <input type="checkbox" id="myAutoChainToggle" style="cursor:pointer; accent-color: var(--accent-green);">
                     <label for="myAutoChainToggle" style="cursor:pointer; user-select:none;">Auto-chain: overwrite .in.txt (or the message box) with the new output for the next pass</label>
                 </span>
             </div>
             <div class="my-section-label">config.json base prompt (editable here, written to disk on "Save config.json")
-                <button class="my-btn" style="padding:2px 8px; font-size:0.7rem; float:right;" onclick="myLoadCreativePromptExample()">Load creative multi-file example</button>
+                <button class="my-btn" style="padding:2px 8px; font-size:0.7rem; float:right;" onclick="myLoadCreativePromptExample()">Load web-page project example</button>
             </div>
             <textarea id="myConfigBasePromptInput" rows="3"
-                      style="width: 100%; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); font-family: var(--font-mono); padding: 8px; box-sizing: border-box; resize: vertical; border-radius: var(--radius);">Read ${input} and produce a concise, improved version that adds a short paragraph better explaining the input. Return only the final output text — no preamble, no commentary, no markdown fences.</textarea>
+                      style="width: 100%; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); font-family: var(--font-mono); padding: 8px; box-sizing: border-box; resize: vertical; border-radius: var(--radius);">Read the text in ${input} and write a short summary in three bullet points. Return only the summary, with no preamble.</textarea>
 
             <div class="my-section-label" style="margin-top:14px;">4 · Run</div>
             <div class="my-btn-row" style="margin-bottom: 8px;">
@@ -1396,50 +1382,53 @@ console.log("hi");</pre>
     </div>
 </div>
 
-<!-- Coding Agent Panel (v019) -->
+<!-- Coding Agent Panel -->
 <div class="my-tools-panel">
     <div class="my-tools-header" onclick="window.myAgTogglePanel()">
-        <div class="my-tools-header-left"><span>🤖</span><span>Coding Agent: tools, coding folder, ESP32 pins, Web Serial</span><span id="myAgBadge" title="proposals waiting" style="display:none;background:#e65100;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.7rem;margin-left:8px;">0</span></div>
+        <div class="my-tools-header-left"><span>🤖</span><span>Coding Agent: read, edit and create files in any project folder</span><span id="myAgBadge" title="proposals waiting" style="display:none;background:#e65100;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.7rem;margin-left:8px;">0</span></div>
         <span class="my-setup-toggle" id="myAgPanelLabel">▼ show</span>
     </div>
     <div class="my-tools-body" id="myAgPanelBody">
-        <details class="my-help"><summary>ℹ Help: how the coding agent works + keyword reference</summary>
+        <details class="my-help"><summary>ℹ Help: how the coding agent works, demos, and your own projects</summary>
             <div class="my-help-body">
-                <h4>Getting started</h4>
-                <ul>
-                    <li><b>Select / Create Coding Folder</b> gives the agent permission to read that folder. It can only see files inside it.</li>
-                    <li>The agent runs on the backend chosen at the top (Ollama or WebGPU), and the selected model does the work.</li>
-                    <li>It inspects files before suggesting anything. Its changes are proposals you can review and approve; an independent review runs first and the Approval setting decides what waits for you (deleting a file always does).</li>
-                    <li>It <b>cannot</b> compile, upload firmware or run the code.</li>
-                    <li>Web Serial needs Chrome or Edge on https or localhost.</li>
-                    <li>The coding folder and the Agentic Folder Automation folder are separate choices. Use different folders so their files do not mix.</li>
-                </ul>
+                <h4>What it is</h4>
+                <p>The coding agent reads, searches, edits and creates files in <b>one project folder</b> that you choose: a web page with html, css and js files, a script folder, or a copy of a GitHub repository. It works on whichever model is chosen at the top (Ollama or WebGPU). It only <b>proposes</b> changes; a separate review runs first, and the Approval setting decides what waits for you (deleting a file always waits). It cannot run your code, install packages or use git.</p>
+                <h4>Demo: find and fix a bug in a tiny web page (3 minutes)</h4>
+                <ol>
+                    <li>Click <b>Select / Create Coding Folder</b> and pick an empty folder (not Documents, Desktop or Downloads themselves; make a subfolder).</li>
+                    <li>Click <b>Create demo files</b>. It adds a small to-do list page: <code>index.html</code>, <code>css/style.css</code>, <code>js/app.js</code> and <code>README.md</code>. It never overwrites files you already have.</li>
+                    <li>Choose the preset <b>Bug finder</b> (the task box fills in) and click <b>Run Agent</b>.</li>
+                    <li>Watch the log. Changes appear as orange cards: read the line differences, then <b>Apply</b> or <b>Reject</b>.</li>
+                    <li>Open <code>index.html</code> in your browser to check the fix. The demo page has two small bugs on purpose.</li>
+                </ol>
+                <h4>Use it on your own project or a GitHub repository</h4>
+                <ol>
+                    <li>Get the project onto your computer. For GitHub, clone it: <code>git clone https://github.com/you/your-repo</code>.</li>
+                    <li>Click <b>Select / Create Coding Folder</b> and pick the project folder (the one that holds <code>index.html</code>, <code>package.json</code> or <code>README.md</code>).</li>
+                    <li>Start with a read-only task such as the preset <b>Explain the project</b>, then ask for one small change at a time.</li>
+                    <li>When you are happy, check the changes yourself and use git (<code>git diff</code>, <code>git commit</code>) outside this page. Small and medium projects work best, and narrow tasks work best with small models.</li>
+                </ol>
+                <h4>Prompts that work for any codebase (plain English)</h4>
+                <div>Explain</div><span class="my-help-ex">List the files, read README.md and index.html, then explain what the project does and how to open it. Do not change any files.</span>
+                <div>Find a bug</div><span class="my-help-ex">Read index.html, css/style.css and js/app.js. The Add button does not work correctly. Find the cause and propose the smallest fix.</span>
+                <div>Add a feature</div><span class="my-help-ex">Add a Delete button next to each task. Edit only the files that need it and keep the code simple.</span>
+                <div>Split files</div><span class="my-help-ex">Move any inline CSS or JavaScript from the html file into css/style.css and js/app.js and link them.</span>
+                <div>Search</div><span class="my-help-ex">Search the project for every place that uses getElementById and check that each id exists in the html.</span>
+                <div>Audit</div><span class="my-help-ex">Audit the JavaScript for errors, rank the three most important problems, propose targeted fixes and review them.</span>
                 <h4>Agent tools (the agent calls these itself)</h4>
-                <p>These are the agent's real tools. You do not type them: describe the job in plain English and the agent picks the tools.</p>
+                <p>You do not type these. Describe the job and the agent picks the tools.</p>
                 <ul>
-                    <li><code>list_files</code> see what files are available</li>
-                    <li><code>read_file</code> read a file (6000 characters per call, it continues for long files)</li>
-                    <li><code>search_files</code> find text across files (case-insensitive, first 30 matching lines)</li>
-                    <li><code>record_audit</code> record findings, with exact evidence from the code, before changing anything</li>
-                    <li><code>propose_file_edit</code> suggest a targeted change to a file it has read</li>
-                    <li><code>propose_file_write</code> suggest a new file or a full rewrite of one</li>
-                    <li><code>propose_file_delete</code> propose deleting a file it has read; always waits for your decision</li>
+                    <li><code>list_files</code> see the files, <code>read_file</code> read a file (6000 characters per call, it continues for long files), <code>search_files</code> find text across files (first 30 matching lines)</li>
+                    <li><code>record_audit</code> write down findings with exact evidence before changing anything</li>
+                    <li><code>propose_file_edit</code> a targeted change to a file it has read, <code>propose_file_write</code> a new file or a full rewrite, <code>propose_file_delete</code> a deletion (always asks you)</li>
                 </ul>
-                <p>It also has <code>get_workspace_summary</code>, <code>inspect_esp32_pin_map</code> and <code>get_serial_status</code> for the board profile and serial connection.</p>
-                <p><b>Workflow rule:</b> inspect (list and read), then record an audit, then propose changes, then an independent review. Proposals are refused until an audit is recorded, and changes to an existing file are refused until the agent has read it.</p>
-                <h4>Prompt wording that encourages each tool (ordinary English, not commands)</h4>
-                <div>READ</div><span class="my-help-ex">READ index.html and inspect the JavaScript functions that control the camera.</span>
-                <div>SEARCH</div><span class="my-help-ex">SEARCH the coding folder for every reference to WebSerial.</span>
-                <div>AUDIT</div><span class="my-help-ex">AUDIT the project for memory leaks and unnecessary TensorFlow.js tensor allocations.</span>
-                <div>EDIT</div><span class="my-help-ex">EDIT only the camera initialization function. Do not rewrite the rest of the file.</span>
-                <div>CREATE</div><span class="my-help-ex">CREATE a new test.html file that demonstrates the camera functionality.</span>
-                <div>REVIEW</div><span class="my-help-ex">REVIEW your proposed changes for errors before finishing.</span>
-                <h4>Example requests</h4>
-                <div>Inspect only</div><span class="my-help-ex">READ the entire project. Identify the five most important improvements, but do not change any files.</span>
-                <div>Make improvements</div><span class="my-help-ex">Inspect the project, audit the JavaScript for errors, prioritize the three most important issues, propose targeted edits and independently review the changes.</span>
+                <p><b>Workflow rule:</b> inspect, then audit, then propose, then independent review. Proposals are refused until an audit is recorded, and edits to an existing file are refused until the agent has read it.</p>
+                <h4>Optional hardware tools</h4>
+                <p>The <b>ESP32 board profile</b> and <b>Web Serial</b> sections near the bottom are only for microcontroller projects (Web Serial needs Chrome or Edge on https or localhost). You can ignore them for web and general coding.</p>
+                <p class="my-help-note">The coding folder and the Agentic Folder Automation folder are separate choices. Use different folders so their files do not mix.</p>
             </div>
         </details>
-        <div style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">Uses the backend chosen at the top (Ollama or WebGPU) and the model set above. Writes are only proposals you approve. The agent cannot compile, flash or run code. Serial needs Chrome/Edge on https or localhost.</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">Uses the backend chosen at the top (Ollama or WebGPU) and the model set above. Writes are only proposals you approve. The agent cannot run code or use git.</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
             <button class="my-btn my-btn-primary my-btn-sm" onclick="myPickCodeFolder()">Select / Create Coding Folder</button>
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="myRelinkCodeFolder()">Relink Last Coding Folder</button>
@@ -1464,7 +1453,7 @@ console.log("hi");</pre>
         </div>
         <div><span id="myAgProviderStatus" style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">not checked yet</span></div>
         <div style="font-size:0.72rem;color:var(--text-muted);font-family:var(--font-mono);">Backend: <strong id="myAgBackendLabel" style="color:var(--accent-blue);">-</strong> · step <strong id="myAgStepLabel">0/0</strong> · time <strong id="myAgTimerLabel">0.0s</strong></div>
-        <textarea id="myAgTask" rows="3" aria-label="Agent task" onkeydown="if(event.ctrlKey&&event.key==='Enter')myRunAgentLoop()" style="width:100%;box-sizing:border-box;background:var(--bg-base);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);font-size:0.75rem;">Read src/main.ino, check the pins against the board profile, and propose a fix for any problem.</textarea>
+        <textarea id="myAgTask" rows="3" aria-label="Agent task" onkeydown="if(event.ctrlKey&&event.key==='Enter')myRunAgentLoop()" style="width:100%;box-sizing:border-box;background:var(--bg-base);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);font-size:0.75rem;">Read index.html, css/style.css and js/app.js. The Add button does not work correctly. Find the cause and propose the smallest fix.</textarea>
         <div>
             <button class="my-btn my-btn-primary my-btn-sm" id="myAgRunBtn" onclick="myRunAgentLoop()">▶ Run Agent (Ctrl+Enter)</button>
             <button class="my-btn my-btn-danger my-btn-sm" onclick="myAgStop()">■ Stop</button>
@@ -1478,10 +1467,10 @@ console.log("hi");</pre>
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="myAgRefreshFiles()">↻ Refresh</button>
         </div>
         <select id="myAgFileList" size="5" aria-label="Files" onchange="myAgOpenFile()" style="width:100%;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"></select>
-        <input id="myAgFilePath" placeholder="path e.g. src/new.ino" style="width:50%;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
+        <input id="myAgFilePath" placeholder="path e.g. js/new.js" style="width:50%;background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;">
         <textarea id="myAgFileText" rows="8" aria-label="File content" style="width:100%;box-sizing:border-box;background:var(--bg-base);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);font-size:0.75rem;"></textarea>
         <div><button class="my-btn my-btn-green my-btn-sm" onclick="myAgSaveEditor()">Propose change from editor</button></div>
-        <details><summary style="cursor:pointer;font-size:0.75rem;">ESP32 board profile and pin check</summary>
+        <details><summary style="cursor:pointer;font-size:0.75rem;">Optional hardware tool: ESP32 board profile and pin check</summary>
             <textarea id="myAgBoard" rows="8" aria-label="Board profile" style="width:100%;box-sizing:border-box;background:var(--bg-base);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);font-size:0.75rem;">{
   "name": "ESP32 DevKit (WROOM-32 example)",
   "gpio": [0,1,2,3,4,5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39],
@@ -1494,7 +1483,7 @@ console.log("hi");</pre>
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="myAgManualPinCheck()">Check pins</button>
             <div style="font-size:0.7rem;color:var(--text-muted);">Generic example profile; edit it for your board. A listed GPIO is not proof of electrical safety.</div>
         </details>
-        <details><summary style="cursor:pointer;font-size:0.75rem;">Web Serial <span id="myAgSerialStatus" style="color:var(--accent-red);">disconnected</span></summary>
+        <details><summary style="cursor:pointer;font-size:0.75rem;">Optional hardware tool: Web Serial <span id="myAgSerialStatus" style="color:var(--accent-red);">disconnected</span></summary>
             <select id="myAgBaud" style="background:var(--bg-panel);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font-mono);font-size:0.75rem;"><option>9600</option><option selected>115200</option><option>921600</option></select>
             <button class="my-btn my-btn-green my-btn-sm" onclick="mySerialConnect()">Connect</button>
             <button class="my-btn my-btn-secondary my-btn-sm" onclick="mySerialDisconnect()">Disconnect</button>
@@ -1507,7 +1496,7 @@ console.log("hi");</pre>
 </div>
 
 <div class="my-footer">
-    index-agentic-v012.html · all inference runs locally · no data leaves your machine
+    index-agentic-v040.html · text and image models run on your computer · your files stay on your computer
 </div>
 
 <!-- Webcam Modal -->
@@ -3747,39 +3736,29 @@ function myWriteStringToView(myView, myOffset, myString) {
     // Also flips on the multi-file toggle, since this prompt is written for it.
     window.myLoadCreativePromptExample = () => {
         document.getElementById('myConfigBasePromptInput').value =
-`You are a code/content generation agent, running as an additive multi-file chain
-(pass \${iteration} so far). The original request was:
+`You are building a small web page project, one new file per pass (pass \${iteration}).
 
+The request is:
 \${original}
 
-Files already created in this project (do NOT recreate or rename any of these —
-this pass must add something NEW that builds on them):
+Files already created (do NOT recreate or rename them):
 \${manifest}
 
-Decide for yourself how many files this project actually needs and what to name
-them — do not default to index.html / style.css / script.js unless the request
-specifically calls for a classic three-file website.
+Add exactly ONE new file this pass, in this order: index.html first, then css/style.css, then js/app.js, then README.md. Skip a file that is already listed. The html file must link to the css and js files by their paths. Keep the code simple, with short comments.
 
-Output ONLY the file(s) for THIS pass, in this exact format, nothing else:
+Answer ONLY in this format, with no other text and no markdown code fences:
 
-=== FILE: your-chosen-name.ext ===
-full file content here
-
-=== FILE: another-name.ext ===
-full file content here
-
-Rules: no text before the first marker, no text after the last file's content, no
-markdown code fences (no \`\`\`) anywhere, and reuse the same "=== FILE: name ===" line
-exactly as shown for every file.`;
+=== FILE: the-file-name ===
+full file content here`;
         document.getElementById('myMultiFileOutputToggle').checked = true;
         if (myAgentDirHandle) {
             // Without this, a stale config.json already in the folder would silently
             // overwrite this textarea back to its old contents the next time the
             // folder is picked or relinked (myAgentLoadConfigIfPresent always wins).
             window.myWriteConfigToFolder();
-            myAgentLog('Loaded creative multi-file example prompt and saved it to config.json (multi-file output enabled).');
+            myAgentLog('Loaded the web-page project example prompt and saved it to config.json (multi-file output enabled).');
         } else {
-            myAgentLog('Loaded creative multi-file example prompt (multi-file output enabled). Pick/relink an agent folder and click "Save config.json" to persist it — otherwise a relink can revert this textarea to whatever\'s already saved on disk.');
+            myAgentLog('Loaded the web-page project example prompt (multi-file output enabled). Pick/relink an agent folder and click "Save config.json" to persist it — otherwise a relink can revert this textarea to whatever\'s already saved on disk.');
         }
     };
 
@@ -3792,7 +3771,7 @@ exactly as shown for every file.`;
     window.myUpdatePipelineModeUI = () => {
         const myMode = document.getElementById('myAgentModeSelect').value;
         document.getElementById('myPipelineHint').textContent = {
-            classic: 'Your base prompt is sent to the model for every input, exactly as in v016.',
+            classic: 'Your base prompt is sent to the model for every input file.',
             create: 'The input text is the project request. Output goes to <name>-project/. The base prompt below is not used. Extra auto-chain passes switch to Improve Mode on the created project.',
             improve: 'The input text is the improvement goal. Project files in the folder are copied to <name>-project/ (originals are never touched), improved there, and pre-change copies are kept in <name>-backup/. The base prompt below is not used. Auto-chain passes repeat the cycle and stop early when no worthwhile improvement remains.'
         }[myMode];
@@ -5680,10 +5659,10 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         let myAgTimerId = null, myAgRunStart = 0;
         const MY_CODE_HANDLE_KEY = "codeFolderHandle";
         const myDemoFiles = {
-            "src/main.ino": "// SAMPLE FILE\nconst int myLedPin = 2;\nconst int myRelayPin = 6;\nvoid setup() {\n  Serial.begin(115200);\n  pinMode(myLedPin, OUTPUT);\n  pinMode(myRelayPin, OUTPUT);\n}\nvoid loop() {\n  digitalWrite(myLedPin, HIGH);\n  delay(500);\n  digitalWrite(myLedPin, LOW);\n  delay(500);\n}\n",
-            "web/index.html": "<!-- SAMPLE FILE -->\n<button onclick=\"mySend('led')\">LED</button>\n<script src=\"app.js\"><\/script>\n",
-            "web/app.js": "// SAMPLE FILE\nfunction mySend(myText) { console.log(myText); }\n",
-            "README.md": "# Sample ESP32 project\nPins: LED = GPIO2, RELAY = GPIO6\n"
+            "index.html": "<!DOCTYPE html>\n<html>\n<head>\n  <title>My To-Do List<\/title>\n  <link rel=\"stylesheet\" href=\"css/style.css\">\n<\/head>\n<body>\n  <h1>My To-Do List<\/h1>\n  <input id=\"myInput\" placeholder=\"New task\">\n  <button class=\"myButton\" onclick=\"myAddTask()\">Add<\/button>\n  <ul id=\"myTaskList\"><\/ul>\n  <script src=\"js/app.js\"><\/script>\n<\/body>\n<\/html>\n",
+            "css/style.css": "body { font-family: sans-serif; max-width: 400px; margin: 2em auto; }\n.button { background: #2a7; color: white; border: 0; padding: 6px 12px; }\nli { margin: 4px 0; }\n",
+            "js/app.js": "function myAddTask() {\n  const myText = document.getElementById(\"myInput\").value;\n  const myItem = document.createElement(\"li\");\n  myItem.textContent = myText;\n  document.getElementById(\"myTasklist\").appendChild(myItem);\n}\n",
+            "README.md": "# To-Do List demo\n\nA tiny web page for trying the coding agent.\n"
         };
         const myAgColors = { idle: "#555", connecting: "#b8860b", thinking: "#0056b3", tool_requested: "#7b1fa2", awaiting_approval: "#e65100", executing_tool: "#7b1fa2", streaming: "#0056b3", completed: "#2e7d32", cancelled: "#757575", error: "#c62828" };
 
@@ -5708,13 +5687,13 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
 
         const myAgPresets = {
             custom: { label: "Custom task (type below)", task: "" },
-            review: { label: "Firmware reviewer: find bugs in the sketch", task: "Read src/main.ino, find likely bugs, and propose one fix with propose_file_edit." },
-            pins: { label: "Pin checker: test pins against the board profile", task: "Read src/main.ino, list every pin it uses, run inspect_esp32_pin_map on them, and propose a fix for any conflict." },
-            forward: { label: "Forward-declaration helper (Arduino IDE style)", task: "Read src/main.ino and propose an edit that pre-declares every variable and function at the top (forward declarations), changing nothing else." },
-            serial: { label: "Serial debug helper: add Serial.print status lines", task: "Read src/main.ino and propose an edit that adds short Serial.println status messages at 115200 baud." },
-            readme: { label: "README writer: document the pin mapping", task: "Read src/main.ino and README.md, then propose a README.md that matches the real pin usage." },
+            bug: { label: "Bug finder: find why something does not work", task: "Read index.html, css/style.css and js/app.js. The Add button does not work correctly. Find the cause and propose the smallest fix." },
+            explain: { label: "Explain the project (read only, no changes)", task: "List the files, read README.md and the main files, then explain what the project does, how the files fit together and how to open it. Do not change any files." },
+            feature: { label: "Add a feature: Delete button on each task", task: "Add a Delete button next to each task so it can be removed. Edit only the files that need it and keep the code simple." },
+            split: { label: "Split files: move inline CSS or JS into separate files", task: "Look for inline CSS or JavaScript in the html files. Move it into css/style.css and js/app.js and link them, changing nothing else." },
+            readme: { label: "README writer: document the project", task: "Read the project files and propose a README.md that explains what the project does, the folder layout and how to run it." },
             improve: { label: "Audit and improve: find the best improvements and implement them", task: "Inspect all project files, audit them for real problems, and propose targeted fixes for the most valuable ones. If nothing is worth changing, say why with evidence." },
-            student: { label: "Student web-page cleaner (my-prefix camelCase)", task: "Read web/index.html and web/app.js and propose simpler versions: camelCase names starting with my, inline onclick, few comments." }
+            student: { label: "Student code cleaner (my-prefix camelCase, simple code)", task: "Read the html and js files and propose simpler versions: camelCase names starting with my, inline onclick, few comments." }
         };
         const myAgModels = ["qwen2.5-coder:1.5b", "qwen2.5-coder:7b", "llama3.2:3b", "gemma4:e2b", "gemma4:12b"];
         window.myAgInitMenus = () => {
