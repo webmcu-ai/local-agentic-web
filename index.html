@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v040</title>
+<title>Ollama Local AI + Agent — v041</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -760,7 +760,7 @@
             <input type="text" id="myModelInput" value="gemma4:12b"
                    placeholder="e.g. gemma4:12b, llama3:8b, mistral"
                    oninput="window.mySaveConfig(); myUpdatePullBtn(); window.myOllamaSyncSelect(); myUpdateStatusBar()" />
-            <select id="myOllamaModelSelect" onchange="window.myHandleOllamaSelectChange()" aria-label="Suggested Ollama models" title="Optional: pick a suggestion to copy it into the box above. You can always type any Ollama model name.">
+            <select id="myOllamaModelSelect" onchange="window.myHandleOllamaSelectChange()" onfocus="window.myCheckOllamaStatus()" aria-label="Suggested Ollama models" title="Optional: pick a suggestion to copy it into the box above. You can always type any Ollama model name.">
                 <option value="">Choose a suggested Ollama model...</option>
                 <option value="qwen2.5-coder:1.5b">qwen2.5-coder:1.5b</option>
                 <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
@@ -785,6 +785,7 @@
         <button class="my-btn my-btn-green" onclick="window.myPullModel()" id="myPullBtn" title="Download the model named above via Ollama">
             ↓ Pull Model
         </button>
+        <button class="my-btn" onclick="window.myCheckOllamaStatus()" title="Ask Ollama which models are installed right now">↻ Refresh models</button>
     </div>
 
     <!-- Installed models (auto-populated) -->
@@ -845,6 +846,7 @@
 
     <!-- Cached models (auto-populated from IndexedDB, mirrors Ollama's "Installed" list) -->
     <div id="myWebgpuCachedList" class="my-installed-list" style="display:none;"></div>
+    <div class="my-storage-info" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin:4px 0 8px;line-height:1.5;"></div>
 
     <div class="my-config-row" style="align-items:center;">
         <label style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); display:flex; align-items:center; gap:8px; cursor:pointer;">
@@ -962,6 +964,7 @@
         </div>
         <div class="my-pull-bar-wrap"><div class="my-pull-bar" id="myImgBar"></div></div>
         <div id="myImgStatus" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px;">Not loaded.</div>
+        <div class="my-storage-info" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin:0 0 8px;line-height:1.5;"></div>
         <div class="my-field my-field-full">
             <label for="myImgPrompt">Image prompt (the text model rewrites this box each frame when the checkbox below is ticked)</label>
             <textarea id="myImgPrompt" rows="5" oninput="window.myImgSave()" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-family:var(--font-mono);">A photorealistic photo of a golden retriever puppy sitting on green grass at sunrise, looking at the camera. Warm natural light from the left, sharp focus, detailed fur, shallow depth of field, shot on a DSLR with an 85mm lens, high quality.</textarea>
@@ -1496,7 +1499,7 @@ print((myFolder / "reading-001.out.txt").read_text())</span>
 </div>
 
 <div class="my-footer">
-    index-agentic-v040.html · text and image models run on your computer · your files stay on your computer
+    index-agentic-v041.html · text and image models run on your computer · your files stay on your computer
 </div>
 
 <!-- Webcam Modal -->
@@ -2134,6 +2137,39 @@ else if (f.type === 'video') {
         };
     };
 
+    // ── Storage check (v041): shows where the model files are kept and asks the browser to keep them ──
+    // Browser storage (IndexedDB and the Cache API) belongs to ONE web address (origin) only. A different
+    // address, a different localhost port, a file:// copy or a private window each get their own empty cache.
+    window.myAskPersistentStorage = async () => {
+        try { if (navigator.storage && navigator.storage.persist) return await navigator.storage.persist(); } catch (e) {}
+        return false;
+    };
+    window.myRefreshStorageInfo = async () => {
+        const myLines = [];
+        myLines.push('Model storage is tied to this address: ' + location.origin + (location.protocol === 'file:' ? '  (file:// has no browser cache, open the page from https or localhost)' : ''));
+        try {
+            if (navigator.storage && navigator.storage.persisted) {
+                const myPersisted = await navigator.storage.persisted();
+                let myUse = '';
+                if (navigator.storage.estimate) { const myE = await navigator.storage.estimate(); myUse = ' · used ' + ((myE.usage || 0) / 1e9).toFixed(2) + ' GB of ' + ((myE.quota || 0) / 1e9).toFixed(1) + ' GB allowed'; }
+                myLines.push('Protected from automatic cleanup: ' + (myPersisted ? 'yes' : 'no (the browser may delete big models when disk space is low)') + myUse);
+            }
+        } catch (e) {}
+        try {
+            if (window.caches) {
+                const myRepos = {};
+                for (const myName of ['transformers-cache', 'my-sd-turbo-cache']) {
+                    if (!(await caches.has(myName))) continue;
+                    const myKeys = await (await caches.open(myName)).keys();
+                    myKeys.forEach((myReq) => { const myM = myReq.url.match(/huggingface\.co\/([^\/]+\/[^\/]+)\//); const myId = myM ? myM[1] : null; if (myId) myRepos[myId] = (myRepos[myId] || 0) + 1; });
+                }
+                const myIds = Object.keys(myRepos);
+                myLines.push('Cached image/text model files here: ' + (myIds.length ? myIds.map((myId) => myId + ' (' + myRepos[myId] + ' files)').join(', ') : 'none yet'));
+            }
+        } catch (e) {}
+        document.querySelectorAll('.my-storage-info').forEach((myEl) => { myEl.textContent = myLines.join('\n'); myEl.style.whiteSpace = 'pre-wrap'; });
+    };
+
     const MY_WEBGPU_DB_NAME = 'mySovereignAiStorage';
     const MY_WEBGPU_STORE   = 'myModelWeightsStore';
 
@@ -2287,6 +2323,8 @@ else if (f.type === 'video') {
         myProgressPct.textContent = '0%';
         myProgressStatus.textContent = 'Checking local cache...';
 
+        let myCacheWarn = '';
+        window.myAskPersistentStorage();
         try {
             if (myEngineKind === 'transformersjs') {
                 // ── Transformers.js (ONNX / WebGPU) — e.g. LFM2.5-2.6B-ONNX ──
@@ -2362,7 +2400,7 @@ else if (f.type === 'video') {
                     }
                     myModelBlob = new Blob(myChunks);
                     try { await mySaveWebgpuModelToStore(myModelCacheKey, myModelBlob); }
-                    catch (myDbErr) { console.warn('IndexedDB cache write failed:', myDbErr); }
+                    catch (myDbErr) { console.warn('IndexedDB cache write failed:', myDbErr); myCacheWarn = ' (warning: could not save the model for next time: ' + (myDbErr && myDbErr.message || myDbErr) + ')'; }
                 }
 
                 myProgressStatus.textContent = 'Compiling WebGPU pipeline...';
@@ -2386,11 +2424,12 @@ else if (f.type === 'video') {
             }
 
             myWebgpuEngineKind = myEngineKind;
-            myProgressStatus.textContent = 'Engine ready';
+            myProgressStatus.textContent = 'Engine ready' + myCacheWarn;
             myProgressBar.style.width = '100%';
             myProgressPct.textContent = '100%';
 
             window.myListCachedWebgpuModels();
+            window.myRefreshStorageInfo();
         } catch (myErr) {
             myProgressStatus.textContent = `Failed: ${myErr.message}`;
             myProgressBar.style.width = '0%';
@@ -2435,7 +2474,7 @@ else if (f.type === 'video') {
         myDot.className    = 'my-status-dot checking';
         myText.textContent = 'checking...';
         try {
-            const myResp = await fetch(`${MY_OLLAMA_BASE}/api/tags`, { signal: AbortSignal.timeout(4000) });
+            const myResp = await fetch(`${MY_OLLAMA_BASE}/api/tags`, { signal: AbortSignal.timeout(4000), cache: 'no-store' });
             if (myResp.ok) {
                 myDot.className    = 'my-status-dot online';
                 myText.textContent = 'ollama found';
@@ -2444,17 +2483,32 @@ else if (f.type === 'video') {
         } catch {
             myDot.className    = 'my-status-dot offline';
             myText.textContent = 'not detected';
+            // Ollama may still be starting when the page opens: try once more shortly after
+            if (!window.myOllamaRetried) { window.myOllamaRetried = true; setTimeout(() => { if (myBackendMode === 'ollama') window.myCheckOllamaStatus(); }, 5000); }
         }
+    };
+
+    // Suggested models (shown in the dropdown after the installed ones)
+    const myOllamaSuggested = ['qwen2.5-coder:1.5b', 'qwen2.5-coder:7b', 'llama3.2:3b', 'gemma4:e2b', 'gemma4:12b'];
+    // Rebuilds the dropdown: installed models first, then suggestions that are not installed yet
+    const myRebuildOllamaSelect = (myInstalledNames) => {
+        const mySelectEl = document.getElementById('myOllamaModelSelect');
+        while (mySelectEl.options.length > 1) mySelectEl.remove(1);
+        const myAdd = (myValue, myLabel) => { const myO = document.createElement('option'); myO.value = myValue; myO.textContent = myLabel; mySelectEl.appendChild(myO); };
+        myInstalledNames.forEach((myN) => myAdd(myN, myN));
+        myOllamaSuggested.filter((myN) => !myInstalledNames.includes(myN)).forEach((myN) => myAdd(myN, myInstalledNames.length ? myN + ' (not installed)' : myN));
+        window.myOllamaSyncSelect();
     };
 
     const myPopulateInstalledModels = (myData) => {
         const myList   = document.getElementById('myInstalledList');
         const myModels = myData.models || [];
-        if (myModels.length === 0) { myList.style.display = 'none'; return; }
 
-        // Track installed model names for pull button gating
+        // Track installed model names for pull button gating and rebuild the dropdown from the live list
         window.myInstalledModelNames = new Set(myModels.map(m => m.name));
+        myRebuildOllamaSelect(myModels.map(m => m.name));
         myUpdatePullBtn();
+        if (myModels.length === 0) { myList.innerHTML = ''; myList.style.display = 'none'; return; }
 
         myList.innerHTML = '<span style="color:var(--text-muted);cursor:default;background:none;border:none;padding:0;">Installed: </span>';
         myModels.forEach(myM => {
@@ -2478,7 +2532,7 @@ else if (f.type === 'video') {
         const myPullBtn = document.getElementById('myPullBtn');
         const myCurrentModel = document.getElementById('myModelInput').value.trim();
         const myInstalled = window.myInstalledModelNames || new Set();
-        const myIsLoaded = myInstalled.has(myCurrentModel);
+        const myIsLoaded = myInstalled.has(myCurrentModel) || myInstalled.has(myCurrentModel + ':latest');
         myPullBtn.disabled = myIsLoaded;
         myPullBtn.title = myIsLoaded
             ? `"${myCurrentModel}" is already installed`
@@ -5318,6 +5372,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         if (!myEng || myEng.disabled) { myImgSetStatus('Error: this engine is not implemented yet.'); return; }
         if (!navigator.gpu) { myImgSetStatus('Error: this browser has no WebGPU.'); return; }
         myImgEl('myImgLoadBtn').disabled = true;
+        window.myAskPersistentStorage();
         try {
             myImgSetStatus('Loading ' + myModelId + ' ...');
             myImgState = await myEng.load(myModelId, (myP) => {
@@ -5334,6 +5389,7 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
             myImgSetStatus('Error loading image model: ' + myErr.message);
         }
         myImgEl('myImgLoadBtn').disabled = false;
+        window.myRefreshStorageInfo();
     };
     window.myImgSetStart = (myInput) => {
         const myFile = myInput.files && myInput.files[0];
@@ -5646,6 +5702,8 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
     })();
 
     myLoadConfig(); // also restores backend choice and pings the right status check
+    window.myRefreshStorageInfo();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && myBackendMode === 'ollama') window.myCheckOllamaStatus(); });
     window.myUpdatePipelineModeUI();
     document.getElementById('myUserInput').focus();
 </script>
