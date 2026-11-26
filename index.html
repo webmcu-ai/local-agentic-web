@@ -41,7 +41,7 @@
 
 
 
-<title>Ollama Local AI + Agent — v041</title>
+<title>Ollama Local AI + Agent — v042</title>
     <script async src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0-alpha.1/es5/tex-mml-chtml.js"></script>
     <style>
         :root {
@@ -918,6 +918,7 @@
                     <li>Mode <b>Normal</b>: click <b>Generate / Next frame</b> once to make the first picture.</li>
                     <li>Switch Mode to <b>Persistent</b>, change one small thing in the prompt (for example "head turned slightly left"), set <b>Frames</b> to 4 and click <b>Continuous generate</b>.</li>
                     <li>Each new frame starts from the previous one. Click <b>Make MP4</b> to turn the frames into a video.</li>
+                    <li>Optional: use <b>Upload images / zip</b> to add your own pictures (or a zip of them) as frames and build the video from those.</li>
                 </ol>
                 <h4>How to get high quality, realistic images</h4>
                 <ul>
@@ -935,6 +936,7 @@
                     <li><b>Normal</b>: every image is made from the text alone. <b>Persistent</b>: the newest frame is the starting point for the next one (SD-Turbo only).</li>
                     <li><b>Change amount</b>: low = small steps between frames, high = big changes.</li>
                     <li><b>Starting image</b>: a picture of your own to begin from in Persistent mode. <b>Reset to original</b> adds it again; <b>Active to original</b> makes the frame you clicked the new original.</li>
+                    <li><b>Upload images / zip</b>: choose one or more pictures (png, jpg, webp, gif, bmp) or a <b>.zip</b> of pictures. Each one is added to the end of the frames, sorted by file name (frame-001, frame-002 ...), so you can reorder, delete, reverse, download or turn them into an MP4. In Persistent mode the newest frame is the next starting point, so uploading a picture is another way to choose where to begin. Pictures are saved as PNG and shrunk if the longest side is over 2048 pixels.</li>
                     <li><b>Reverse frames</b> flips the order of the frames shown (and the zip and MP4). Frames can also be dragged to reorder or deleted with ✕.</li>
                 </ul>
                 <h4>Advanced (optional)</h4>
@@ -994,6 +996,9 @@ Change only ONE small thing (the pose, head angle or expression) by a tiny step,
             <div class="my-field"><label for="myImgFinalFile">Final image</label>
                 <input type="file" id="myImgFinalFile" accept="image/*" style="display:none" onchange="window.myImgSetFinal(this)" />
                 <div><button class="my-btn my-btn-secondary my-btn-sm" onclick="document.getElementById('myImgFinalFile').click()">Choose file</button> <span id="myImgFinalName" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);">No file chosen</span></div></div>
+            <div class="my-field"><label for="myImgUploadFile">Upload images or a zip (added as frames)</label>
+                <input type="file" id="myImgUploadFile" accept="image/*,.zip,application/zip" multiple style="display:none" onchange="window.myImgUpload(this)" />
+                <div><button class="my-btn my-btn-secondary my-btn-sm" onclick="document.getElementById('myImgUploadFile').click()" title="Choose one or more image files, or a .zip of images. Each picture becomes a frame.">Upload images / zip</button> <span id="myImgUploadName" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-secondary);">No file chosen</span></div></div>
             <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);"><input type="checkbox" id="myImgUseLlm" /> Let the text model suggest each next change</label>
             <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);"><input type="checkbox" id="myImgTargetOn" /> Move towards the Final image (latent, SD-Turbo, Persistent mode)</label>
             <div class="my-field"><label for="myImgTargetInfluence">Target influence: <span id="myImgTargetInfluenceLabel">0.15</span></label>
@@ -1499,7 +1504,7 @@ print((myFolder / "reading-001.out.txt").read_text())</span>
 </div>
 
 <div class="my-footer">
-    index-agentic-v041.html · text and image models run on your computer · your files stay on your computer
+    index-agentic-v042.html · text and image models run on your computer · your files stay on your computer
 </div>
 
 <!-- Webcam Modal -->
@@ -5415,6 +5420,77 @@ const myImproveDone = (myMode, myCtx) => myMode === 'improve' || myCtx.iteration
         myImgEl('myImgFinal').style.display = 'block';
         myInput.value = '';
         myImgSetStatus('Final image set. With "Let the text model suggest each next change" checked, the text model compares the present image with it.');
+    };
+    // ── Upload images: several image files, or a .zip of images. Every picture becomes a frame (as PNG, longest side max 2048). ──
+    const myImgToPng = async (myBlob) => {
+        const myBmp = await createImageBitmap(myBlob);
+        const myK = Math.min(1, 2048 / Math.max(myBmp.width, myBmp.height));
+        const myCanvas = document.createElement('canvas');
+        myCanvas.width = Math.round(myBmp.width * myK); myCanvas.height = Math.round(myBmp.height * myK);
+        myCanvas.getContext('2d').drawImage(myBmp, 0, 0, myCanvas.width, myCanvas.height);
+        myBmp.close();
+        return await new Promise((myOk) => myCanvas.toBlob(myOk, 'image/png'));
+    };
+    const myImgIsPicture = (myName) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(myName) && !/(^|\/)(__MACOSX|\.)/.test(myName);
+    // Reads a .zip: finds the central directory, then unpacks stored (0) or deflate (8) entries.
+    const myImgReadZip = async (myZipFile) => {
+        const myBuf = await myZipFile.arrayBuffer(), myView = new DataView(myBuf), myBytes = new Uint8Array(myBuf);
+        let myEnd = -1;
+        for (let myI = myBuf.byteLength - 22; myI >= Math.max(0, myBuf.byteLength - 70000); myI--) { if (myView.getUint32(myI, true) === 0x06054b50) { myEnd = myI; break; } }
+        if (myEnd < 0) throw new Error(myZipFile.name + ' is not a valid zip file.');
+        const myCount = myView.getUint16(myEnd + 10, true);
+        let myPos = myView.getUint32(myEnd + 16, true);
+        const myDec = new TextDecoder(), myOut = [];
+        for (let myN = 0; myN < myCount; myN++) {
+            if (myView.getUint32(myPos, true) !== 0x02014b50) break;
+            const myMethod = myView.getUint16(myPos + 10, true), myCompSize = myView.getUint32(myPos + 20, true);
+            const myNameLen = myView.getUint16(myPos + 28, true), myExtraLen = myView.getUint16(myPos + 30, true), myCommentLen = myView.getUint16(myPos + 32, true);
+            const myLocal = myView.getUint32(myPos + 42, true);
+            const myName = myDec.decode(myBytes.subarray(myPos + 46, myPos + 46 + myNameLen));
+            myPos += 46 + myNameLen + myExtraLen + myCommentLen;
+            if (!myImgIsPicture(myName)) continue;
+            const myDataStart = myLocal + 30 + myView.getUint16(myLocal + 26, true) + myView.getUint16(myLocal + 28, true);
+            const myRaw = myBytes.subarray(myDataStart, myDataStart + myCompSize);
+            let myData;
+            if (myMethod === 0) myData = myRaw;
+            else if (myMethod === 8) myData = new Uint8Array(await new Response(new Blob([myRaw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+            else continue;
+            myOut.push({ name: myName.split('/').pop(), blob: new Blob([myData]) });
+        }
+        return myOut;
+    };
+    window.myImgUpload = async (myInput) => {
+        const myFiles = Array.from(myInput.files || []);
+        myInput.value = ''; // so choosing the same file again still works
+        if (!myFiles.length) return;
+        if (myImgBusy) { myImgSetStatus('Wait until generation has stopped before uploading images.'); return; }
+        myImgBusy = true;
+        try {
+            const myPics = [];
+            for (const myFile of myFiles) {
+                if (/\.zip$/i.test(myFile.name) || myFile.type === 'application/zip') {
+                    myImgSetStatus('Reading ' + myFile.name + ' ...');
+                    (await myImgReadZip(myFile)).forEach((myP) => myPics.push(myP));
+                } else if (myImgIsPicture(myFile.name) || myFile.type.startsWith('image/')) myPics.push({ name: myFile.name, blob: myFile });
+            }
+            myPics.sort((myA, myB) => myA.name.localeCompare(myB.name, undefined, { numeric: true }));
+            let myAdded = 0, mySkipped = 0;
+            for (const myP of myPics) {
+                myImgSetStatus('Adding image ' + (myAdded + mySkipped + 1) + ' of ' + myPics.length + ' ...');
+                try {
+                    const myPng = await myImgToPng(myP.blob);
+                    myImgHistory.push({ blob: myPng, url: URL.createObjectURL(myPng), ms: 0, prompt: '(uploaded: ' + myP.name + ')' });
+                    myAdded++;
+                } catch (myErr) { mySkipped++; }
+            }
+            myImgEl('myImgUploadName').textContent = myFiles.map((myF) => myF.name).join(', ');
+            window.myImgRenderGallery();
+            if (myAdded) window.myImgShow(myImgHistory.length - 1);
+            myImgSetStatus(myAdded ? ('Added ' + myAdded + ' image' + (myAdded === 1 ? '' : 's') + ' as frames' + (mySkipped ? ' (' + mySkipped + ' could not be read)' : '') + '. In Persistent mode the newest frame is the next starting point.') : 'No readable images found. Use png, jpg, webp, gif or bmp files, or a zip of them.');
+        } catch (myErr) {
+            myImgSetStatus('Upload error: ' + myErr.message);
+        }
+        myImgBusy = false;
     };
     const myImgToBase64 = async (myBlob) => {
         const myBmp = await createImageBitmap(myBlob);
